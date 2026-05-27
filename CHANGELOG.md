@@ -4,6 +4,22 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [1.5.0] — 2026-05-27
+
+### Installer
+- **Expanded tool support** — Cursor, Gemini CLI, and Antigravity CLI now detected and installed alongside Claude Code and Codex
+- Cursor skills now copied to `~/.cursor/skills/` (previously only git hook capture was noted)
+- Added Gemini CLI detection → `~/.gemini/skills/`
+- Added Antigravity CLI detection → `~/.antigravity/skills/` (Google's official Gemini CLI successor)
+- Warning message on no-tool-detected updated to list all five supported tools
+
+### README
+- Tool support matrix expanded to include Cursor, Gemini CLI, Antigravity CLI — all five tools share the same skill auto-trigger mechanism
+- Added skill install locations table
+- Removed `(OMX)` label from Codex row
+
+---
+
 ## [1.4.0] — 2026-05-27
 
 ### Installer

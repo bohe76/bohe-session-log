@@ -2,7 +2,7 @@
 
 Persistent session memory for AI coding assistants — log what you did, resume instantly next session.
 
-Works on **macOS / Linux / Windows** with **Claude Code**, **Cursor**, and **Codex**.
+Works on **macOS / Linux / Windows** with **Claude Code**, **Codex**, **Cursor**, **Gemini CLI**, and **Antigravity CLI**.
 
 ## Install
 
@@ -22,7 +22,7 @@ cd bohe-session-log; pwsh -ExecutionPolicy Bypass -File install.ps1
 
 The installer:
 
-- Copies skills to `~/.claude/skills/` (Claude Code) and `~/.codex/skills/` (Codex) if detected
+- Copies skills to each detected tool's skills directory (Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI)
 - Copies the hook script to a stable location (`~/.bohe-session-log/`) so deleting the cloned repo doesn't break it
 - Installs a `post-commit` git hook that **respects your existing `core.hooksPath`** and **appends to any existing hook** rather than overwriting
 
@@ -40,7 +40,7 @@ If you see `## [HH:MM] test hook ...`, the hook is working.
 
 - `git` 2.9+
 - `bash` (Git Bash on Windows is fine) OR PowerShell 5.1+ for `install.ps1`
-- One of: Claude Code, Cursor, Codex (optional — the hook works without any AI tool)
+- One of: Claude Code, Codex, Cursor, Gemini CLI, or Antigravity CLI (optional — the hook works without any AI tool)
 
 ## What it does
 
@@ -70,11 +70,23 @@ git commit
 
 | Tool | Skill auto-trigger | Git hook capture | Enrich after commit |
 |------|:-:|:-:|:-:|
-| Claude Code | ✓ (description keywords) | ✓ | ✓ (via magic keyword) |
-| Codex | ✓ (description keywords) | ✓ | — (skill must be invoked manually) |
-| Cursor | — (no global skills) | ✓ | — (paste SKILL.md content into chat to invoke) |
+| Claude Code | ✓ | ✓ | ✓ (magic keyword) |
+| Codex | ✓ | ✓ | — |
+| Cursor | ✓ | ✓ | — |
+| Gemini CLI | ✓ | ✓ | — |
+| Antigravity CLI | ✓ | ✓ | — |
 
-**Cursor users**: the git hook still captures every commit into the draft. To get a session log written, open `skills/bohe-session-log/SKILL.md`, paste its content (or `@`-reference it) into Cursor chat and say "end session". Same for `bohe-session-start` at the next session.
+### Skill install locations
+
+| Tool | Global skills directory |
+|------|------------------------|
+| Claude Code | `~/.claude/skills/` |
+| Codex | `~/.codex/skills/` |
+| Cursor | `~/.cursor/skills/` |
+| Gemini CLI | `~/.gemini/skills/` |
+| Antigravity CLI | `~/.antigravity/skills/` |
+
+The installer auto-detects which tools are present and copies skills to each directory. Enrich mode (auto-triggered after commit) is Claude Code only — other tools invoke `/세션종료` manually.
 
 ## Session log format
 

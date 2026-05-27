@@ -1,5 +1,5 @@
 # bohe-session-log installer (Windows / PowerShell 5.1+)
-# Supports: Claude Code, Codex (OMX), Cursor, and any git-based workflow.
+# Supports: Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, and any git-based workflow.
 #
 # Design mirrors install.sh:
 #   - Hook script copied to a STABLE location (~/.bohe-session-log/)
@@ -42,7 +42,7 @@ if (Test-Path $ClaudeDir) {
   $SkillsInstalled++
 }
 
-# ── 3. Skills: Codex (OMX) ──────────────────────────────────────────────────
+# ── 3. Skills: Codex ────────────────────────────────────────────────────────
 $CodexDir = Join-Path $HOME '.codex'
 if (Test-Path $CodexDir) {
   $Target = Join-Path $CodexDir 'skills'
@@ -53,12 +53,40 @@ if (Test-Path $CodexDir) {
   $SkillsInstalled++
 }
 
-# ── 4. Cursor ───────────────────────────────────────────────────────────────
-if (Test-Path (Join-Path $HOME '.cursor')) {
-  Write-Host 'OK  Cursor       -> git hook covers commit capture (no skill auto-trigger)'
+# ── 4. Skills: Cursor ───────────────────────────────────────────────────────
+$CursorDir = Join-Path $HOME '.cursor'
+if (Test-Path $CursorDir) {
+  $Target = Join-Path $CursorDir 'skills'
+  New-Item -ItemType Directory -Force -Path $Target | Out-Null
+  Copy-Item -Recurse -Force (Join-Path $SkillsSrc 'bohe-session-log')   $Target
+  Copy-Item -Recurse -Force (Join-Path $SkillsSrc 'bohe-session-start') $Target
+  Write-Host "OK  Cursor       -> $Target"
+  $SkillsInstalled++
 }
 
-# ── 5. Git hook — respect existing config, append don't overwrite ───────────
+# ── 5. Skills: Gemini CLI ───────────────────────────────────────────────────
+$GeminiDir = Join-Path $HOME '.gemini'
+if (Test-Path $GeminiDir) {
+  $Target = Join-Path $GeminiDir 'skills'
+  New-Item -ItemType Directory -Force -Path $Target | Out-Null
+  Copy-Item -Recurse -Force (Join-Path $SkillsSrc 'bohe-session-log')   $Target
+  Copy-Item -Recurse -Force (Join-Path $SkillsSrc 'bohe-session-start') $Target
+  Write-Host "OK  Gemini CLI   -> $Target"
+  $SkillsInstalled++
+}
+
+# ── 6. Skills: Antigravity CLI ──────────────────────────────────────────────
+$AntigravityDir = Join-Path $HOME '.antigravity'
+if (Test-Path $AntigravityDir) {
+  $Target = Join-Path $AntigravityDir 'skills'
+  New-Item -ItemType Directory -Force -Path $Target | Out-Null
+  Copy-Item -Recurse -Force (Join-Path $SkillsSrc 'bohe-session-log')   $Target
+  Copy-Item -Recurse -Force (Join-Path $SkillsSrc 'bohe-session-start') $Target
+  Write-Host "OK  Antigravity  -> $Target"
+  $SkillsInstalled++
+}
+
+# ── 7. Git hook — respect existing config, append don't overwrite ───────────
 $ExistingHooksPath = $null
 try { $ExistingHooksPath = git config --global --get core.hooksPath 2>$null } catch {}
 if ([string]::IsNullOrWhiteSpace($ExistingHooksPath)) {
@@ -109,8 +137,8 @@ if ($HookDirIsNew) {
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 Write-Host ''
-if ($SkillsInstalled -eq 0 -and -not (Test-Path (Join-Path $HOME '.cursor'))) {
-  Write-Host 'WARN  No supported AI tool detected (~/.claude / ~/.codex / ~/.cursor).'
+if ($SkillsInstalled -eq 0) {
+  Write-Host 'WARN  No supported AI tool detected (~/.claude / ~/.codex / ~/.cursor / ~/.gemini / ~/.antigravity).'
   Write-Host '      Skills were not installed. Git hook works regardless of AI tool.'
 } else {
   Write-Host 'Done. Restart your AI tool to activate the skills.'

@@ -1,6 +1,6 @@
 #!/bin/bash
 # bohe-session-log installer (macOS / Linux / Windows-via-Git-Bash)
-# Supports: Claude Code, Codex (OMX), Cursor, and any git-based workflow.
+# Supports: Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, and any git-based workflow.
 #
 # Design:
 #   - Hook script is copied to a STABLE location (~/.bohe-session-log/)
@@ -43,7 +43,7 @@ if [ -d "$HOME/.claude" ]; then
   SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
 fi
 
-# ── 3. Skills: Codex (OMX) ──────────────────────────────────────────────────
+# ── 3. Skills: Codex ────────────────────────────────────────────────────────
 if [ -d "$HOME/.codex" ]; then
   TARGET="$HOME/.codex/skills"
   mkdir -p "$TARGET"
@@ -53,12 +53,37 @@ if [ -d "$HOME/.codex" ]; then
   SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
 fi
 
-# ── 4. Cursor (no native skills dir; git hook handles capture) ──────────────
+# ── 4. Skills: Cursor ───────────────────────────────────────────────────────
 if [ -d "$HOME/.cursor" ]; then
-  echo "✓ Cursor       → git hook covers commit capture (no skill auto-trigger)"
+  TARGET="$HOME/.cursor/skills"
+  mkdir -p "$TARGET"
+  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
+  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
+  echo "✓ Cursor       → $TARGET"
+  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
 fi
 
-# ── 5. Git hook — respect existing config, append don't overwrite ───────────
+# ── 5. Skills: Gemini CLI ───────────────────────────────────────────────────
+if [ -d "$HOME/.gemini" ]; then
+  TARGET="$HOME/.gemini/skills"
+  mkdir -p "$TARGET"
+  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
+  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
+  echo "✓ Gemini CLI   → $TARGET"
+  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
+fi
+
+# ── 6. Skills: Antigravity CLI ──────────────────────────────────────────────
+if [ -d "$HOME/.antigravity" ]; then
+  TARGET="$HOME/.antigravity/skills"
+  mkdir -p "$TARGET"
+  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
+  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
+  echo "✓ Antigravity  → $TARGET"
+  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
+fi
+
+# ── 7. Git hook — respect existing config, append don't overwrite ───────────
 EXISTING_HOOKS_PATH="$(git config --global --get core.hooksPath 2>/dev/null || true)"
 if [ -n "$EXISTING_HOOKS_PATH" ]; then
   HOOK_DIR="$EXISTING_HOOKS_PATH"
@@ -106,8 +131,8 @@ fi
 
 # ── Summary ─────────────────────────────────────────────────────────────────
 echo ""
-if [ "$SKILLS_INSTALLED" -eq 0 ] && [ ! -d "$HOME/.cursor" ]; then
-  echo "⚠ No supported AI tool detected (~/.claude / ~/.codex / ~/.cursor)."
+if [ "$SKILLS_INSTALLED" -eq 0 ]; then
+  echo "⚠ No supported AI tool detected (~/.claude / ~/.codex / ~/.cursor / ~/.gemini / ~/.antigravity)."
   echo "  Skills were not installed. Git hook works regardless of AI tool."
 else
   echo "Done. Restart your AI tool to activate the skills."
