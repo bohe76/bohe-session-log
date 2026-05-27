@@ -1,6 +1,25 @@
 # Changelog
 
-Change history for session management skills (bohe-session-log, bohe-session-start).
+Change history for session management skills (bohe-session-log, bohe-session-start) and the installer.
+
+---
+
+## [1.4.0] — 2026-05-27
+
+### Installer
+- **Cross-platform support** — added `install.ps1` / `uninstall.ps1` for Windows-native PowerShell users (bash installer still works on macOS / Linux / Git Bash)
+- **Stable hook location** — hook script now copied to `~/.bohe-session-log/post-commit.sh`; deleting the cloned repo no longer breaks the hook
+- **Respects existing `core.hooksPath`** — installer detects pre-existing config and installs into that same directory instead of overwriting
+- **Append-only hook integration** — if `post-commit` already exists, append a delegation line instead of overwriting user's content
+- Added `uninstall.sh` / `uninstall.ps1` — strips delegation lines, removes stable hook, deletes skills; preserves `core.hooksPath` and project session logs
+
+### Skills
+- **Korean trigger keywords** added to skill descriptions: `"세션 종료"`, `"세션 시작"`, `"업무 준비"`, etc.
+
+### Repo
+- Added `LICENSE` (MIT)
+- Added `.github/` issue and PR templates
+- README: cross-platform install commands, requirements, verification step, troubleshooting, tool support matrix, uninstall instructions
 
 ---
 
@@ -12,7 +31,7 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 - **Simplified L2** — recent 3 files × decisions_summary → only the 2nd most recent session's decisions_summary
 
 ### bohe-session-log
-- **Removed legacy format coexistence rules section** — unnecessary now that new format is fixed
+- **Trimmed legacy format coexistence rules** — removed the dedicated section detailing how to handle old and new formats side by side. Brief compatibility note retained so old logs still parse
 - **Cleaned up notes section** — consolidated general notes (no code details, plan references, no artifact duplication, XML notes) into the notes section
 
 ---
