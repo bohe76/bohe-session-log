@@ -29,9 +29,8 @@ The directory is auto-created if missing. Session logs and drafts are **gitignor
 - Date: `YYYY-MM-DD` format
 - Examples: `main-00020-2026-04-14.md`, `feature-chat-00001-2026-04-14.md`
 
-**Draft**: `{branch}.draft.md`
-- Example: `main.draft.md`, `feature-chat.draft.md`
-- One per branch; accumulates checkpoint stubs appended by the post-commit hook
+**Draft**: `session.draft.md`
+- Single branch-agnostic file; accumulates checkpoint stubs appended by the post-commit hook (branch recorded in stub header)
 
 ## Behavior
 
@@ -61,12 +60,12 @@ At the start of the next session, read the **latest log for the current branch**
 
 ### 3. Write content
 
-Analyze the current conversation context and `{branch}.draft.md`, then automatically fill in each section of the template below.
+Analyze the current conversation context and `session.draft.md`, then automatically fill in each section of the template below.
 **Save directly without proposing a draft first** (do not ask the user).
 
 #### Using the Draft
 
-Always check the current branch's `{branch}.draft.md` before ending a session:
+Always check `session.draft.md` before ending a session:
 
 - File **exists**: read as raw material for writing the log, then reset after saving (overwrite with empty file)
 - File **does not exist**: write the log from conversation context alone (normal case)
@@ -199,7 +198,7 @@ Write the session log by analyzing the current conversation context and the draf
 
 **Procedure**:
 
-1. Read `{branch}.draft.md` — enriched entries are the raw material
+1. Read `session.draft.md` — enriched entries are the raw material (branch identified from the `branch:` field in each stub header)
 2. Fill in the template: classify entries into done/decisions/pivots/open/blockers/todos/files; extract tags/entities/decisions_summary
 3. Write to `docs/session-log/{branch}-{number}-{YYYY-MM-DD}.md`
 4. Reset draft (overwrite with empty file)
@@ -217,7 +216,7 @@ Simply end after log is complete. No need to suggest `/clear`.
 
 **Behavior**:
 
-1. Check current branch, determine draft path
+1. Check `session.draft.md` path; identify branch from the `branch:` field in the last stub
 2. Read the **last `##` block** in the draft (= the stub for the commit just made)
 3. Replace the "what was done" bullets (commit message repeat) with **specific content based on conversation context**
    - Add `[decision]` bullets if relevant
@@ -229,14 +228,14 @@ Simply end after log is complete. No need to suggest `/clear`.
 
 **Before (stub):**
 ```
-## [10:23] feat(chat): floating panel switch <!-- sha:abc123 -->
+## [10:23] feat(chat): floating panel switch <!-- sha:abc123 branch:main -->
 - feat(chat): floating panel switch
 ---
 ```
 
 **After (enriched):**
 ```
-## [10:23] feat(chat): floating panel switch <!-- sha:abc123 -->
+## [10:23] feat(chat): floating panel switch <!-- sha:abc123 branch:main -->
 - Fixed right sidebar → fixed bottom-right floating panel structure
 - [decision] Width w-[448px] confirmed, sidebar approach abandoned
 ---

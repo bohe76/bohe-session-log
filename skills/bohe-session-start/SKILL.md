@@ -31,8 +31,8 @@ Check current branch name, then compare mtimes of the draft and the latest sessi
 
 ```bash
 BRANCH=$(git branch --show-current | tr '/' '-')
-DRAFT="docs/session-log/${BRANCH}.draft.md"
-LATEST_LOG=$(ls -t docs/session-log/${BRANCH}-*.md 2>/dev/null | head -1)
+DRAFT="docs/session-log/session.draft.md"
+LATEST_LOG=$(ls -t docs/session-log/*.md | grep -v '\.draft\.md' | head -1)
 ```
 
 **Decision condition** — treat as unfinished if BOTH conditions are met:

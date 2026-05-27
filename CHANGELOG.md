@@ -4,6 +4,24 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [1.6.0] — 2026-05-27
+
+### bohe-session-log
+- **Unified draft file** — replaced per-branch `{branch}.draft.md` with a single `session.draft.md` across all branches
+- Stub header now includes `branch:$BRANCH` metadata so the correct branch context is preserved in the shared file
+- `session.draft.md` is parsed by reading the `branch:` field in each `## [HH:MM]` block header
+- Enrich mode updated: no longer resolves branch-specific path; reads the last block from `session.draft.md` directly
+
+### bohe-session-start
+- Step 0 unfinished-session detection updated to use `session.draft.md` and branch-agnostic log glob
+
+### post-commit hook (`hooks/post-commit.sh`)
+- Draft path changed from `docs/session-log/${BRANCH}.draft.md` → `docs/session-log/session.draft.md`
+- Stub header format changed to `<!-- sha:SHA branch:BRANCH -->` for branch identification
+- Duplicate check updated to match on `sha:SHA` substring (format-agnostic)
+
+---
+
 ## [1.5.0] — 2026-05-27
 
 ### Installer
