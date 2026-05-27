@@ -1,56 +1,47 @@
 # bohe-session-log
 
-Claude Code skills for persistent session memory — write logs at session end, resume instantly at session start.
+Persistent session memory for AI coding assistants — log what you did, resume instantly next session.
 
-## Overview
+Works with **Claude Code**, **Cursor**, and **Codex**.
 
-Two skills that work together to give Claude a persistent memory across sessions:
-
-| Skill | Role |
-|-------|------|
-| **bohe-session-log** | Writes a structured session log at the end of each session |
-| **bohe-session-start** | Loads the previous session's context at the start of each session |
-
-The log format is designed for AI parsing accuracy first — XML-tagged sections with frontmatter metadata for fast search.
-
-## Installation
-
-Copy the skill directories into your Claude Code global skills folder:
+## Install
 
 ```bash
-cp -r skills/bohe-session-log ~/.claude/skills/
-cp -r skills/bohe-session-start ~/.claude/skills/
+git clone https://github.com/bohe76/bohe-session-log
+cd bohe-session-log && bash install.sh
 ```
 
-Then install the git commit hook that auto-enriches drafts:
+The installer auto-detects your tools and sets everything up:
+- Copies skills to `~/.claude/skills/` (Claude Code) and/or `~/.codex/skills/` (Codex)
+- Installs a global git post-commit hook that works across all tools
 
-```bash
-cp skills/bohe-session-log/hooks/post-commit.sh ~/.claude/hooks/draft_checkpoint.sh
-chmod +x ~/.claude/hooks/draft_checkpoint.sh
+## What it does
+
+A git hook captures every commit into a rolling draft. At session end, your AI writes a structured log. Next session, it loads the log and picks up exactly where you left off.
+
+```
+git commit
+  → hook appends stub to draft
+  → Claude Code: auto-enriches stub with conversation context
+
+"end session"
+  → AI writes formal session log from draft + conversation
+
+"session start" / "where were we"
+  → AI loads previous decisions, open questions, and TODOs
+  → ready to continue
 ```
 
-Register the hook in `~/.claude/settings.json` — see `skills/bohe-session-log/hooks/settings-snippet.json` for the snippet to add.
+## Skills
 
-## Usage
+| Skill | Trigger | Role |
+|-------|---------|------|
+| `bohe-session-log` | "end session", "save session", "wrap up" | Writes structured session log |
+| `bohe-session-start` | "session start", "where were we", "continue" | Loads previous session context |
 
-**At session start** — say any of:
-> "session start", "resume work", "continue", "where were we"
+Skills are Claude Code native. For Cursor and Codex, the git hook still captures commits — invoke the skill behavior by pasting the SKILL.md content when needed.
 
-Claude loads the previous session's decisions, open questions, and TODOs.
-
-**At session end** — say any of:
-> "end session", "save session", "session done", "wrap up"
-
-Claude writes a structured log to `docs/session-log/` with everything needed to resume next time.
-
-**Search past sessions** — say:
-> "find sessions about {topic}", "when did we decide {X}"
-
-Claude greps frontmatter only (fast) and presents candidate sessions.
-
-## Log Format
-
-Each session log is a Markdown file with YAML frontmatter and XML-tagged body sections:
+## Session log format
 
 ```markdown
 ---
@@ -68,45 +59,24 @@ related_sessions: [main-00004-2026-04-18]
 
 # Session 5 — 2026-04-20 (main)
 
-<done>
-- ...
-</done>
-
-<decisions>
-- ...
-</decisions>
-
-<todos>
-- [ ] ...
-</todos>
+<done>- ...</done>
+<decisions>- ...</decisions>
+<todos>- [ ] ...</todos>
 ```
 
-Logs are stored in `docs/session-log/` which is gitignored — personal work records stay local.
-
-## How it works
-
-```
-Session end:
-  git commit → hook appends stub to draft → enrich mode fills in details
-  "end session" → bohe-session-log writes formal log from draft + context
-
-Session start:
-  bohe-session-start reads latest log (skips <done>, loads decisions/todos)
-  + reads decisions_summary from 2nd most recent log
-  → Claude is ready to continue
-```
+Logs live in `docs/session-log/` which is gitignored — personal records stay local.
 
 ## Files
 
 ```
+install.sh
 skills/
   bohe-session-log/
-    SKILL.md          — skill definition
+    SKILL.md
     hooks/
-      post-commit.sh        — git hook version
-      settings-snippet.json — Claude Code hook config snippet
+      post-commit.sh       — git hook (installed globally by install.sh)
   bohe-session-start/
-    SKILL.md          — skill definition
+    SKILL.md
 CHANGELOG.md
 ```
 

@@ -275,34 +275,22 @@ Simply end after log is complete. No need to suggest `/clear`.
   - Always match opening/closing pairs — mismatches will break parsing in the next session
   - Markdown bullets/checkboxes/strikethrough are all allowed inside tags
 
-## Initial Setup Check (Automatic)
+## Setup Check (Automatic)
 
-On invoke, execute in this order:
-
-1. Check if `~/.claude/skills/bohe-session-log/.setup_done` exists
-   - **Exists** → skip immediately, ignore remaining steps
-   - **Does not exist** → proceed to step 2
-
-2. Check if `~/.claude/hooks/draft_checkpoint.sh` exists
-   - **Exists** → create `.setup_done` file and skip
-     ```bash
-     touch ~/.claude/skills/bohe-session-log/.setup_done
-     ```
-   - **Does not exist** → output installation guide below, create `.setup_done` after user confirms completion
-
-### Installation Guide (only output when hook is missing)
+On first invoke, check whether the global git hook is installed:
 
 ```bash
-# 1. Copy hook script
-cp ~/.claude/skills/bohe-session-log/hooks/post-commit.sh ~/.claude/hooks/draft_checkpoint.sh
-chmod +x ~/.claude/hooks/draft_checkpoint.sh
-
-# 2. Register hook in Claude Code settings (see settings-snippet.json)
-# Add the contents of ~/.claude/skills/bohe-session-log/hooks/settings-snippet.json
-# to the PostToolUse array in ~/.claude/settings.json
+git config --global core.hooksPath  # should point to a directory containing post-commit
 ```
 
-After confirming installation:
-```bash
-touch ~/.claude/skills/bohe-session-log/.setup_done
+- **Hook found** → proceed normally, no output
+- **Hook not found** → notify the user once:
+
 ```
+⚠ bohe-session-log: git hook not detected.
+  Commit stubs won't be captured until the hook is installed.
+  Run: bash install.sh  (from the bohe-session-log repo)
+  Or visit: https://github.com/bohe76/bohe-session-log
+```
+
+Do not block normal skill operation — the skill works without the hook (draft-less mode: writes the session log from conversation context only).
