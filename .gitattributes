@@ -1,0 +1,15 @@
+# Shell scripts must use LF line endings to run via bash on all platforms.
+# Without this, Git's autocrlf on Windows would convert them to CRLF and
+# bash would fail with "bad interpreter" or "command not found" errors.
+*.sh        text eol=lf
+post-commit text eol=lf
+
+# PowerShell scripts work with either, but CRLF is the native convention.
+*.ps1       text eol=crlf
+
+# Markdown / config: let git pick; explicit is better than implicit.
+*.md        text
+*.json      text
+*.yml       text
+*.yaml      text
+LICENSE     text
