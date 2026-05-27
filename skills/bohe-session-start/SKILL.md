@@ -4,7 +4,8 @@ description: >-
   Loads project context at session start so Claude can resume work seamlessly.
   Absorbs the previous session log and prior session decisions.
   Triggers on: "session start", "resume work", "continue", "where were we",
-  "load context", "session log search", "find related session".
+  "load context", "session log search", "find related session",
+  "세션시작", "세션 시작", "업무준비", "업무 준비".
 ---
 
 # bohe-session-start: Session Start Context Load + Session Log Search

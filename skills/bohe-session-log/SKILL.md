@@ -3,8 +3,9 @@ name: bohe-session-log
 description: >-
   Writes or updates a session log so work can continue seamlessly in the next session.
   Triggers on keywords: "session log", "save session", "end session", "session off",
-  "wrap up session", "session done". Also auto-triggers in enrich mode when a git
-  commit hook emits "[MAGIC KEYWORD: bohe-session-log enrich]".
+  "wrap up session", "session done", "세션로그", "세션 종료", "세션종료".
+  Also auto-triggers in enrich mode when a git commit hook emits
+  "[MAGIC KEYWORD: bohe-session-log enrich]".
 ---
 
 # bohe-session-log: Session Log Management
