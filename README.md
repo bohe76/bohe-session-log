@@ -71,7 +71,7 @@ git commit
 | Tool | Skill auto-trigger | Git hook capture | Enrich after commit |
 |------|:-:|:-:|:-:|
 | Claude Code | ✓ (description keywords) | ✓ | ✓ (via magic keyword) |
-| Codex (OMX) | ✓ (description keywords) | ✓ | — (skill must be invoked manually) |
+| Codex | ✓ (description keywords) | ✓ | — (skill must be invoked manually) |
 | Cursor | — (no global skills) | ✓ | — (paste SKILL.md content into chat to invoke) |
 
 **Cursor users**: the git hook still captures every commit into the draft. To get a session log written, open `skills/bohe-session-log/SKILL.md`, paste its content (or `@`-reference it) into Cursor chat and say "end session". Same for `bohe-session-start` at the next session.
@@ -96,7 +96,11 @@ related_sessions: [main-00004-2026-04-18]
 
 <done>- ...</done>
 <decisions>- ...</decisions>
+<pivots>- ...</pivots>
+<open>- ...</open>
+<blockers>- ...</blockers>
 <todos>- [ ] ...</todos>
+<files>- path/to/file.ts — what changed</files>
 ```
 
 Logs live in `docs/session-log/` which is gitignored — personal records stay local.
