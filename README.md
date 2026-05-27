@@ -70,11 +70,11 @@ git commit
 
 | Tool | Skill auto-trigger | Git hook capture | Enrich after commit |
 |------|:-:|:-:|:-:|
-| Claude Code | ✓ | ✓ | ✓ (magic keyword) |
-| Codex | ✓ | ✓ | — |
-| Cursor | ✓ | ✓ | — |
-| Gemini CLI | ✓ | ✓ | — |
-| Antigravity CLI | ✓ | ✓ | — |
+| Claude Code | ✓ | ✓ | ✓ |
+| Codex | ✓ | ✓ | ✓ |
+| Cursor | ✓ | ✓ | ✓ |
+| Gemini CLI | ✓ | ✓ | ✓ |
+| Antigravity CLI | ✓ | ✓ | ✓ |
 
 ### Skill install locations
 
@@ -86,7 +86,7 @@ git commit
 | Gemini CLI | `~/.gemini/skills/` |
 | Antigravity CLI | `~/.antigravity/skills/` |
 
-The installer auto-detects which tools are present and copies skills to each directory. Enrich mode (auto-triggered after commit) is Claude Code only — other tools invoke `/세션종료` manually.
+The installer auto-detects which tools are present and copies skills to each directory.
 
 ## Session log format
 
