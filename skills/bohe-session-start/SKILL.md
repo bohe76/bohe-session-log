@@ -32,12 +32,17 @@ Check current branch name, then compare mtimes of the draft and the latest sessi
 ```bash
 BRANCH=$(git branch --show-current | tr '/' '-')
 DRAFT="docs/session-log/session.draft.md"
-LATEST_LOG=$(ls -t docs/session-log/*.md | grep -v '\.draft\.md' | head -1)
+LATEST_LOG=$(ls -t docs/session-log/*.md 2>/dev/null | grep -v '\.draft\.md' | head -1)
 ```
 
 **Decision condition** — treat as unfinished if BOTH conditions are met:
 1. Draft file exists and is non-empty (`-s`)
-2. No session log exists, or draft is newer than the log (`draft -nt LATEST_LOG`)
+2. No session log exists (`LATEST_LOG` empty string) **or** draft is newer than the log
+
+```bash
+# Correct implementation — includes the empty LATEST_LOG case
+[ -s "$DRAFT" ] && { [ -z "$LATEST_LOG" ] || [ "$DRAFT" -nt "$LATEST_LOG" ]; }
+```
 
 **If unfinished detected**, suggest in one line to the user:
 > "It looks like the previous session wasn't closed. Would you like to write the session log now?"
@@ -55,14 +60,17 @@ Read both layers and absorb them into Claude's own working memory. Do not enumer
 
 #### L1 — Most recent session (latter half only, excluding `<done>`)
 
-**Most recent file by mtime** (excluding draft):
+**Current branch's latest first, fallback to most recent by mtime** (excluding draft):
 
 ```bash
-ls -t docs/session-log/*.md | grep -v '\.draft\.md' | head -1
+BRANCH=$(git branch --show-current | tr '/' '-')
+BRANCH_LOG=$(ls -t "docs/session-log/${BRANCH}-"*.md 2>/dev/null | grep -v '\.draft\.md' | head -1)
+GLOBAL_LOG=$(ls -t docs/session-log/*.md 2>/dev/null | grep -v '\.draft\.md' | head -1)
+L1_LOG=${BRANCH_LOG:-$GLOBAL_LOG}
 ```
 
-- If no file exists → "no previous session log"
-- If the adopted log's frontmatter `branch` differs from the current git branch, indicate "continuing from a different branch ({branch name})" in the user output
+- If `L1_LOG` is empty → "no previous session log"
+- If falling back to `GLOBAL_LOG` because `BRANCH_LOG` is empty → the adopted log's frontmatter `branch` may differ from the current branch. Indicate "continuing from a different branch ({branch name})" in the user output
 
 **Read strategy — load only from `</done>` onwards**:
 - Run `grep -n '</done>' <file>` to find the closing line number
@@ -184,6 +192,7 @@ Old-format session logs don't have `tags`/`entities`/`decisions_summary`/`relate
 - **L1 in context load mode reads only the latter half excluding `<done>`** — absorbs only `<decisions>`/`<pivots>`/`<open>`/`<blockers>`/`<todos>`/`<files>`. Do not summarize from frontmatter alone or read everything including `<done>`. `<done>` details are lazy-loaded via re-Read on user request.
 - **Search mode's frontmatter grep must not be confused with full Read** — search is for narrowing down "which session is relevant"; actual context requires a full Read of the selected session.
 - **Claude internalization is the goal** — user report is one compressed format. Do not proactively provide detailed summaries. Expand only when user asks "tell me more".
-- In context load mode, L1/L2 are by mtime regardless of branch — identify which branch each file is from by the branch name in the filename
+- In context load mode, **L1 prefers the current branch's latest** (fallback to most recent by mtime), **L2 is the 2nd most recent globally by mtime** — identify which branch each file is from by the branch name in the filename. Since only L1 is branch-first, if another branch has a more recent log its decisions may not be caught by either L1 or L2 (an acceptable asymmetry — L2 stays branch-agnostic as its purpose is to supplement "the decision before the previous one")
 - If L2 conflicts with older information, **trust the current code/files** — records seen in skills are past snapshots
 - **Legacy log compatibility**: old-format logs without XML tags (only MD headers) must also be parseable. Understand the mappings: `## What was done` ↔ `<done>`, `## Decisions` ↔ `<decisions>`, etc.
+- **Git worktree is an isolated session space**: each worktree's `docs/session-log/` is physically isolated. Session-start only searches logs within the current worktree. To access another worktree's session log, Read it directly by specifying that worktree's path.

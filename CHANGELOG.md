@@ -4,6 +4,16 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [Unreleased]
+
+### bohe-session-start
+- **Step 0 bugfix** — added `2>/dev/null` to `ls`, made the empty-`LATEST_LOG` case explicit (`[ -z "$LATEST_LOG" ]` branch). Prevents missed detection in environments without session logs, e.g. new worktrees
+- **L1 branch-first selection** — prefer the current branch's latest log over the globally newest file by mtime, falling back to mtime when absent. Fixes loss of current-branch prior-session context after a branch switch
+- **Notes addition** — documented Git worktree isolated session space behavior
+- **Review fix** — corrected the "L1/L2 by mtime regardless of branch" note that contradicted the new L1 branch-first logic (clarified the L1 branch-first / L2 global-2nd asymmetry); added `grep -v draft` to the `BRANCH_LOG` glob for consistency with `GLOBAL_LOG`
+
+---
+
 ## [1.6.0] — 2026-05-27
 
 ### bohe-session-log
