@@ -4,7 +4,7 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
-## [Unreleased]
+## [1.7.0] — 2026-05-31
 
 ### bohe-session-log
 - **Removed enrich mode — switched to git-hook stub-only** — dropped the post-commit LLM enrichment of draft stubs. The git post-commit hook now appends commit-message stubs only (no LLM); content is consolidated into the formal log at session end. Side effect: the `[MAGIC KEYWORD]` echo and the Claude-only keyword-detector dependency are gone, so **draft capture now works uniformly across all tools (Claude/Codex/Cursor/...)**. Draft quality as "raw material" is sufficient; final log quality is guaranteed by the session-end LLM. Cleaned enrich residue from the description, the "Using the Draft" example, Step 1, and update-mode rules; removed the Enrich Mode section.
