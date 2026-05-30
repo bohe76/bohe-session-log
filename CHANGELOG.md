@@ -6,6 +6,12 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ## [Unreleased]
 
+### bohe-session-log
+- **Removed enrich mode — switched to git-hook stub-only** — dropped the post-commit LLM enrichment of draft stubs. The git post-commit hook now appends commit-message stubs only (no LLM); content is consolidated into the formal log at session end. Side effect: the `[MAGIC KEYWORD]` echo and the Claude-only keyword-detector dependency are gone, so **draft capture now works uniformly across all tools (Claude/Codex/Cursor/...)**. Draft quality as "raw material" is sufficient; final log quality is guaranteed by the session-end LLM. Cleaned enrich residue from the description, the "Using the Draft" example, Step 1, and update-mode rules; removed the Enrich Mode section.
+
+### post-commit hook (`hooks/post-commit.sh`)
+- **Rewritten as stub-only union** — brought the shared reference in line with v1.6.0 (single `session.draft.md`, `<!-- sha:short branch:BRANCH -->` header) that the file had drifted from, and added safety guards: opt-in guard (no-op unless `docs/session-log/` exists — prevents the global `core.hooksPath` from polluting every repo), duplicate-SHA skip, and meta-commit filter. Removed the `[MAGIC KEYWORD]` emit.
+
 ### bohe-session-start
 - **Step 0 bugfix** — added `2>/dev/null` to `ls`, made the empty-`LATEST_LOG` case explicit (`[ -z "$LATEST_LOG" ]` branch). Prevents missed detection in environments without session logs, e.g. new worktrees
 - **L1 branch-first selection** — prefer the current branch's latest log over the globally newest file by mtime, falling back to mtime when absent. Fixes loss of current-branch prior-session context after a branch switch

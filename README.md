@@ -48,8 +48,7 @@ A git hook captures every commit into a rolling draft. At session end, your AI w
 
 ```
 git commit
-  → hook appends stub to docs/session-log/<branch>.draft.md
-  → Claude Code: auto-enriches stub with conversation context
+  → hook appends a commit-message stub to docs/session-log/session.draft.md
 
 "end session" / "save session"
   → AI writes a formal session log from draft + conversation
@@ -68,13 +67,13 @@ git commit
 
 ### Tool support matrix
 
-| Tool | Skill auto-trigger | Git hook capture | Enrich after commit |
-|------|:-:|:-:|:-:|
-| Claude Code | ✓ | ✓ | ✓ |
-| Codex | ✓ | ✓ | ✓ |
-| Cursor | ✓ | ✓ | ✓ |
-| Gemini CLI | ✓ | ✓ | ✓ |
-| Antigravity CLI | ✓ | ✓ | ✓ |
+| Tool | Skill auto-trigger | Git hook capture |
+|------|:-:|:-:|
+| Claude Code | ✓ | ✓ |
+| Codex | ✓ | ✓ |
+| Cursor | ✓ | ✓ |
+| Gemini CLI | ✓ | ✓ |
+| Antigravity CLI | ✓ | ✓ |
 
 ### Skill install locations
 

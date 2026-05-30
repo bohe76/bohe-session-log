@@ -4,8 +4,8 @@ description: >-
   Writes or updates a session log so work can continue seamlessly in the next session.
   Triggers on keywords: "session log", "save session", "end session", "session off",
   "wrap up session", "session done", "세션로그", "세션 종료", "세션종료".
-  Also auto-triggers in enrich mode when a git commit hook emits
-  "[MAGIC KEYWORD: bohe-session-log enrich]".
+  Commit-time draft stubs are appended automatically by the git post-commit hook;
+  the formal session log is written by this skill on a session-end request.
 ---
 
 # bohe-session-log: Session Log Management
@@ -30,7 +30,7 @@ The directory is auto-created if missing. Session logs and drafts are **gitignor
 - Examples: `main-00020-2026-04-14.md`, `feature-chat-00001-2026-04-14.md`
 
 **Draft**: `session.draft.md`
-- Single branch-agnostic file; accumulates checkpoint stubs appended by the post-commit hook (branch recorded in stub header)
+- Single branch-agnostic file; accumulates commit stubs appended by the post-commit hook (branch recorded in stub header)
 
 ## Behavior
 
@@ -70,19 +70,18 @@ Always check `session.draft.md` before ending a session:
 - File **exists**: read as raw material for writing the log, then reset after saving (overwrite with empty file)
 - File **does not exist**: write the log from conversation context alone (normal case)
 
-`.draft.md` is a cumulative file of stubs appended by the post-commit hook on every git commit. Format:
+`.draft.md` is a cumulative file of stubs appended by the post-commit hook on every git commit. Each stub holds the **commit message only** (no LLM involved — just what git knows). Format:
 
 ```
-## [10:23] feat(studio): AI chat panel to floating
-- Fixed right sidebar → fixed bottom-right floating panel
-- [decision] Width w-[448px] confirmed, sidebar approach abandoned
+## [10:23] feat(studio): AI chat panel to floating <!-- sha:abc123 branch:main -->
+- feat(studio): AI chat panel to floating
 ---
-## [11:45] fix(ChatPanel): block selection context retention bug
-- .border-l selector → #chat-panel-wrapper id
+## [11:45] fix(ChatPanel): block selection context retention bug <!-- sha:def456 branch:main -->
+- fix(ChatPanel): block selection context retention bug
 ---
 ```
 
-**Parse by splitting on `## [HH:MM]`**. Regular bullets go into the `<done>` tag; `[decision]` bullets go into `<decisions>`.
+**Parse by splitting on `## [HH:MM]`**. Each stub's commit message goes into the `<done>` tag chronologically. Decisions, pivots, and other context not present in the stub are **extracted from the conversation** and placed in the relevant tags (`<decisions>`, `<pivots>`, etc.).
 
 If the session crashed multiple times or formal logs have been missing for an extended period, the draft may accumulate content across multiple days. In that case, **treat the entire draft as raw material** and consolidate it into a single formal log — do not treat it as stale.
 
@@ -186,8 +185,7 @@ When the user says "end session" or equivalent, follow this sequence:
 
 Check `git status` for changes:
 - Changes exist → git add + git commit **work files only** (exclude session log and draft)
-  - The post-commit hook automatically appends a stub to the draft and emits the enrich signal
-  - Enrich mode auto-triggers to replace the last draft stub with conversation context
+  - The post-commit hook automatically appends a stub (commit message) to the draft (no LLM, works on all tools)
 - No changes → skip commit, proceed to step 2
 
 ### Step 2 — Write session log
@@ -198,7 +196,7 @@ Write the session log by analyzing the current conversation context and the draf
 
 **Procedure**:
 
-1. Read `session.draft.md` — enriched entries are the raw material (branch identified from the `branch:` field in each stub header)
+1. Read `session.draft.md` — commit stub entries are the raw material (branch identified from the `branch:` field in each stub header)
 2. Fill in the template: classify entries into done/decisions/pivots/open/blockers/todos/files; extract tags/entities/decisions_summary
 3. Write to `docs/session-log/{branch}-{number}-{YYYY-MM-DD}.md`
 4. Reset draft (overwrite with empty file)
@@ -207,45 +205,6 @@ Write the session log by analyzing the current conversation context and the draf
 ### Step 3 — End
 
 Simply end after log is complete. No need to suggest `/clear`.
-
----
-
-## Enrich Mode
-
-**Trigger**: post-commit hook emits `[MAGIC KEYWORD: bohe-session-log enrich]` after a commit → skill auto-fires.
-
-**Behavior**:
-
-1. Check `session.draft.md` path; identify branch from the `branch:` field in the last stub
-2. Read the **last `##` block** in the draft (= the stub for the commit just made)
-3. Replace the "what was done" bullets (commit message repeat) with **specific content based on conversation context**
-   - Add `[decision]` bullets if relevant
-   - Do not modify the header (`## [HH:MM] ...`) or `---` separator
-4. Report in one line after completion:
-   ```
-   ✓ enrich: [HH:MM] {commit message}
-   ```
-
-**Before (stub):**
-```
-## [10:23] feat(chat): floating panel switch <!-- sha:abc123 branch:main -->
-- feat(chat): floating panel switch
----
-```
-
-**After (enriched):**
-```
-## [10:23] feat(chat): floating panel switch <!-- sha:abc123 branch:main -->
-- Fixed right sidebar → fixed bottom-right floating panel structure
-- [decision] Width w-[448px] confirmed, sidebar approach abandoned
----
-```
-
-**Notes**:
-- Only modify the last block — do not touch other entries
-- Never repeat the commit message — replace with more specific content
-- Maximum 5 lines per entry
-- If draft file is missing or last block parsing fails → notify user of failure reason
 
 ---
 
@@ -262,8 +221,8 @@ Simply end after log is complete. No need to suggest `/clear`.
   - For `<todos>`, mark completed items with `~~strikethrough~~` then add new items
   - Deleting existing content is absolutely forbidden — even incorrect content must be preserved with `~~strikethrough~~`
   - **Draft integration in update mode**:
-    - Draft entry regular bullets go into `<done>` tag body under `### Update HH:MM` section
-    - `[decision]` bullets are appended at the end of `<decisions>` tag
+    - Draft entries (commit stubs) go into `<done>` tag body under `### Update HH:MM` section
+    - Decisions are extracted from the conversation and appended at the end of `<decisions>` tag
     - Frontmatter `stage`/`tldr` are overwritten to reflect current state
     - Frontmatter `tags`/`entities`/`decisions_summary` are **merged** with existing (deduplicated)
     - If draft has multiple time entries, consolidate all under `### Update` with the latest time
