@@ -197,6 +197,7 @@ Write the session log by analyzing the current conversation context and the draf
 **Procedure**:
 
 1. Read `session.draft.md` — commit stub entries are the raw material (branch identified from the `branch:` field in each stub header)
+   - **If the session was compacted** → use Transcript Recovery's "Compaction" path: a sub-agent reads the current session's transcript to supplement (stubs are commit messages only, so compacted detail isn't lost)
 2. Fill in the template: classify entries into done/decisions/pivots/open/blockers/todos/files; extract tags/entities/decisions_summary
 3. Write to `docs/session-log/{branch}-{number}-{YYYY-MM-DD}.md`
 4. Reset draft (overwrite with empty file)
@@ -205,6 +206,38 @@ Write the session log by analyzing the current conversation context and the draf
 ### Step 3 — End
 
 Simply end after log is complete. No need to suggest `/clear`.
+
+---
+
+## Transcript Recovery (crash / compaction)
+
+The draft holds commit-message stubs only, so if a session **didn't end gracefully (crash) or was compacted mid-way** (context window compressed), stubs alone make for thin recovery. In that case, **read the conversation transcript from disk** as raw material — the transcript persists in full on disk regardless of compaction/crash.
+
+**Not needed normally** — on a graceful end the conversation context is still live, so no extra read. Fires only in two cases:
+
+- **Compaction** (at session end, Step 2 of this skill): if the session was compacted, the current context is a summary missing detail → read the **current session's transcript** to fill it in
+- **Crash** (at next session start, `bohe-session-start` unfinished detection): the previous session ended with no log → read the **previous session's transcript** to recover
+
+### Finding the transcript
+
+**The currently-running tool finds its own session record** (each CLI writes the conversation to disk):
+- Criteria: the session matching the **current working directory (cwd) + most recently modified (mtime)**
+- Known location hints:
+  - **Claude Code**: `~/.claude/projects/<encoded-cwd>/<session>.jsonl`
+  - **Codex**: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (filter by cwd)
+  - **Antigravity CLI**: find `conversationId` via `workspace`(=cwd) in `~/.gemini/antigravity-cli/history.jsonl` → `~/.gemini/antigravity-cli/brain/<conversationId>/.system_generated/logs/transcript_full.jsonl`
+  - **Other tools**: locate your CLI's session-record directory and apply the same criteria (cwd + latest)
+- If not found → recover from draft stubs only (degraded mode). Don't guess; tell the user "transcript not found, writing from stubs only"
+
+### Token management (don't read the whole thing)
+
+Transcripts can be large (tool calls/results are most of the bytes). Bound the cost:
+- **Scope**: only the range since the last formal log (or last draft stub) — usually one session's worth
+- **Filter**: drop `tool_use`/`tool_result`/attachments **plus** skill-load text (`Base directory for this skill…`), `<system-reminder>`, and slash-command blocks → keep **user input + assistant text only** (Claude jsonl example: extract user/assistant text with `jq`, then `perl -0pe 's/<system-reminder>.*?<\/system-reminder>//gs'`). Measured: 3.4MB → 84KB (~1/40) while preserving recovery quality (Haiku reconstruction 92%)
+- **Sub-agent delegation**: a Haiku/Sonnet sub-agent reads the transcript and organizes it into done/decisions/pivots/… → **main context receives only the result** (protects main tokens)
+- If a summary (compaction summary / rollout summary) exists, prefer it; otherwise use the filtered transcript
+
+Recovery is a **rare event** (only on an un-ended session), so a sub-agent spending tens of K tokens once is acceptable — a normal (graceful) end costs nothing.
 
 ---
 

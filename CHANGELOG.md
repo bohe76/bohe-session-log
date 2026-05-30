@@ -4,6 +4,16 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [1.8.0] — 2026-05-31
+
+### bohe-session-log
+- **Transcript-based recovery** — guards against sessions that didn't end gracefully (crash/compaction). The draft is stub-only (commit messages), so recovery was thin; now the **conversation transcript** (which persists in full on disk regardless of compaction) is read as raw material. Two cases: ① **compaction** (session-end Step 2 — current session transcript) ② **crash** (`bohe-session-start` unfinished detection — previous session transcript). Discovery is delegated to each agent ("find your CLI's record by cwd + latest") with per-tool hints (Claude `~/.claude/projects/`, Codex `~/.codex/sessions/`, Antigravity CLI `~/.gemini/antigravity-cli/`). Token management: scope (since last log) · filter (drop tool noise + skill-load + `<system-reminder>` → ~1/40) · **sub-agent delegation** protects main context → zero cost on a graceful end. hook/stub/draft format unchanged. **Verified end-to-end on Claude**: discovery → filter (3.4MB→84KB) → sub-agent (Haiku) recovery at 92% confidence
+
+### bohe-session-start
+- **Crash-recovery fallback** — on Step 0 unfinished detection (approved), recover from the previous session's transcript (see `bohe-session-log` §Transcript Recovery "Crash")
+
+---
+
 ## [1.7.0] — 2026-05-31
 
 ### bohe-session-log

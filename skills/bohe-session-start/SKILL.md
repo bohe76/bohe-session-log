@@ -48,6 +48,7 @@ LATEST_LOG=$(ls -t docs/session-log/*.md 2>/dev/null | grep -v '\.draft\.md' | h
 > "It looks like the previous session wasn't closed. Would you like to write the session log now?"
 
 - Approved → run `bohe-session-log` → continue after completion
+  - The previous session may have ended in a crash (draft stubs are commit messages only) → **recover from the previous session's transcript**. Follow `bohe-session-log` §Transcript Recovery "Crash" (finding the transcript + token management: scope / filter / sub-agent delegation)
 - Declined → briefly read and absorb draft as supplementary L1 context, then continue
 
 **Not detected** (no draft or draft is older than log) → skip silently.
