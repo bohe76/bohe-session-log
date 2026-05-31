@@ -104,7 +104,7 @@ related_sessions: [{previous related session filenames or numbers}]
 # Session {number} — {YYYY-MM-DD} ({branch})
 
 <done>
-- (chronological, discussions and implementation mixed)
+- (chronological — key narrative summary only: the trunk the next session needs, not everything. Details are backed by transcript & git)
 </done>
 
 <decisions>
@@ -128,7 +128,7 @@ related_sessions: [{previous related session filenames or numbers}]
 </todos>
 
 <files>
-- `path/to/file` — what was done
+- `path/to/file` — what was done (only changes git doesn't track)
 </files>
 ```
 
@@ -136,13 +136,13 @@ related_sessions: [{previous related session filenames or numbers}]
 
 | Tag | Meaning | Content | Can be empty |
 |-----|---------|---------|:---:|
-| `<done>` | What was done | Everything done this session (discussions, research, implementation, debugging, etc.) | ❌ Required |
+| `<done>` | What was done | **Key narrative summary** of this session (the trunk of discussions/implementation/debugging — not an exhaustive list; details backed by transcript & git) | ❌ Required |
 | `<decisions>` | Decisions | Confirmed items. Must not be reversed next session | ⭕ Omit tag if empty |
 | `<pivots>` | Direction changes | What changed direction this session and why | ⭕ Omit tag if empty |
 | `<open>` | Unresolved | Questions without answers yet, deferred discussions | ⭕ Omit tag if empty |
 | `<blockers>` | Waiting | User actions, external confirmations, etc. blocking progress | ⭕ Omit tag if empty |
 | `<todos>` | Next session TODOs | Work to start immediately next session. Checkbox format | ❌ Required |
-| `<files>` | Changed files | Files created/modified/deleted this session | ⭕ Omit tag if empty |
+| `<files>` | Changes outside git | **Only changes git doesn't track** — global (`~/.claude`·`~/.git-hooks`), memory, releases/tags, other repos. Committed repo files are delegated to `git log` (no duplication) | ⭕ Omit tag if empty |
 
 ## Frontmatter Field Guide
 
@@ -260,6 +260,8 @@ Recovery is a **rare event** (only on an un-ended session), so a sub-agent spend
     - Frontmatter `tags`/`entities`/`decisions_summary` are **merged** with existing (deduplicated)
     - If draft has multiple time entries, consolidate all under `### Update` with the latest time
 - Do not write code details — only path and summary in `<files>`
+- **`<files>` records only changes git doesn't track** — committed repo files have `git log --stat` as the source of truth, so don't re-list them. Record only what this repo's git diff misses: global config (`~/.claude`·`~/.git-hooks`), memory, releases/tags, other-repo changes
+- **`<decisions>` is the session ADR** — it holds the full story (including the why) of that session's decisions as a log. Only rules that "always apply going forward" are promoted separately to memory (`MEMORY.md`) — decisions (session log) and memory are layers, not duplicates (the log retains content, memory extracts rules). Search via frontmatter `decisions_summary`
 - Reference detailed plans by path only (do not copy content)
 - **No artifact duplication** — content already in PRDs, plans, ADRs, issues, commits, or diffs must not be copied into the body; use path/URL references only (e.g. `details: docs/prd/auth.md#token-policy`)
 - **XML tag notes**:

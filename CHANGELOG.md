@@ -4,6 +4,19 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [1.9.0] — 2026-05-31
+
+### bohe-session-log
+- **`<files>` tag redefined — only changes git doesn't track** — committed repo files are delegated to `git log` (no duplication); `<files>` now records only global (`~/.claude`·`~/.git-hooks`), memory, releases/tags, and other-repo changes
+- **`<done>` is now a key narrative summary** — not an exhaustive list, just the trunk the next session needs (details backed by transcript & git)
+- **`<decisions>` = session ADR, layer clarified** — the session log retains the full decision story; only "always-apply" rules are promoted to memory (layers, not duplicates)
+- Tag set of 7 kept as-is (done/decisions/pivots/open/blockers/todos/files)
+
+### bohe-session-start
+- **"Lightweight resume" made explicit** — L1 absorbs only minimal continue-context; deeper context via search mode / `<done>` lazy Read. `<files>` absorb item updated to "changes outside git". Softened the "60–70% of file" figure to a qualitative phrase (no real contradiction with `<done>` summarization)
+
+---
+
 ## [1.8.0] — 2026-05-31
 
 ### bohe-session-log

@@ -17,10 +17,11 @@ A skill for **Claude to internalize project state** when a new conversation sess
 - **Search mode** (triggers on "search session logs", "find sessions about XX", etc.): greps only frontmatter metadata to present relevant session candidates → reads full content only for the one the user selects
 
 **Design philosophy**:
-- In context load mode, L1 **reads only the latter half excluding `<done>`** — absorbs only `<decisions>`/`<pivots>`/`<open>`/`<blockers>`/`<todos>`/`<files>`. `<done>` (60–70% of the file) is unnecessary for resuming the next session, and is lazy-loaded only on user request
+- In context load mode, L1 **reads only the latter half excluding `<done>`** — absorbs only `<decisions>`/`<pivots>`/`<open>`/`<blockers>`/`<todos>`/`<files>`. `<done>` (still the largest chunk of the body, even as a summary) is unnecessary for resuming the next session, and is lazy-loaded only on user request
 - L2 reads only the `decisions_summary` field from the 2nd most recent session (1 item). Without this, decisions from sessions before the most recent one would be missed at minimal cost
 - In search mode, only grep frontmatter fields (`tags`, `entities`, `decisions_summary`, `related_sessions`, etc.) → quickly narrow down candidates without reading full files
 - Output to user is **one short paragraph + TODOs only** — detailed summaries are kept internal to Claude only
+- **Session start is "lightweight resume"** — L1 absorbs only the minimal context to continue (decisions, open items, todos); if you need "what exactly was done last time", reach for search mode / `<done>` lazy Read. `<done>` can be skipped routinely without hurting resume, and is kept as a faithful record that surfaces the full picture the moment you search it
 
 
 ## Context Load Mode (default)
@@ -75,7 +76,7 @@ L1_LOG=${BRANCH_LOG:-$GLOBAL_LOG}
 
 **Read strategy — load only from `</done>` onwards**:
 - Run `grep -n '</done>' <file>` to find the closing line number
-- Specify `offset=<that line>` in the Read tool → skip the `<done>` section (saves 60–70% of file)
+- Specify `offset=<that line>` in the Read tool → skip the `<done>` section (saves most of the body)
 - If no `</done>` found (legacy MD format) → fall back to reading the full file
 
 **Items to absorb** (essential for resuming next session):
@@ -84,7 +85,7 @@ L1_LOG=${BRANCH_LOG:-$GLOBAL_LOG}
 - `<open>` — unresolved questions
 - `<blockers>` — waiting on external items
 - `<todos>` — tasks to continue (included in user output)
-- `<files>` — files recently touched
+- `<files>` — changes outside git (global·memory·releases, etc. recently touched)
 
 **`<done>` is lazy-read**: only re-read the same file (without `offset`, or with `limit=<done end>`) when the user explicitly asks "what did we do last session in detail".
 
