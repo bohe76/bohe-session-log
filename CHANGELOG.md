@@ -4,6 +4,13 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [1.9.1] — 2026-06-01
+
+### bohe-session-log
+- **tags/entities guidance — "this session's distinctive traits" principle** — session logs are a closed set searched only within `docs/session-log/`, so tags/entities carry only what distinguishes this session from other session logs. Words common to every session (skill names like `session-log`/`session-start`) are excluded as non-discriminative. Frontmatter table wording also corrected ("Core keyword search" → "Identify this session (in-folder search)").
+
+---
+
 ## [1.9.0] — 2026-05-31
 
 ### bohe-session-log

@@ -95,7 +95,7 @@ date: {YYYY-MM-DD}
 project: {project name}
 stage: {planning / design / implementation / verification / done}
 tldr: {one-line summary}
-tags: [{domain/feature keywords}]
+tags: [{this session's distinctive topic keywords}]
 entities: [{key component/module/file names}]
 decisions_summary: [{key decisions, one-line each}]
 related_sessions: [{previous related session filenames or numbers}]
@@ -154,16 +154,16 @@ related_sessions: [{previous related session filenames or numbers}]
 | `project` | Project name | Project filter | `my-project` |
 | `stage` | Phase | Phase filter | `implementation` |
 | `tldr` | One-line summary | Preview | — |
-| `tags` | Domain/feature keyword list | **Core keyword search** | `[chat, ui, auth]` |
-| `entities` | Key component/module/file name list | **Entity tracking** | `[ChatPanel, useAuth]` |
+| `tags` | This session's distinctive topics | **Identify this session (in-folder search)** | `[chat, ui, auth]` |
+| `entities` | What this session touched | **What this session worked on** | `[ChatPanel, useAuth]` |
 | `decisions_summary` | Key decisions, one-line summaries | **Decision search** | `["w-[448px] floating fixed", "pnpm adopted"]` |
 | `related_sessions` | Previous related session filenames/numbers | **Session linking** | `[feature-chat-00003-2026-04-14]` |
 
 `tags` / `entities` / `decisions_summary` / `related_sessions` are optional but **fill them out as much as possible to improve searchability**. Empty list `[]` is allowed.
 
-**tags guide**: Use domain/feature area words common in the current project. Remove duplicates. 3–8 items recommended.
+**tags guide**: Session logs are a closed set searched only within `docs/session-log/`. So tags carry only **the topics that distinguish this session from other session logs** — words common to every session (in this repo, skill names like `session-log`/`session-start` themselves) have no discriminative value and are excluded. Favor the concrete topics this session actually covered + version. Remove duplicates. 3–8 items recommended.
 
-**entities guide**: Use actual code symbol names/file names as-is, so they can be found with grep during search.
+**entities guide**: The components/modules/files/symbols this session actually touched, by their real names. Favor what's specific to this session over common targets that recur every session (grep search also happens within the session-log folder).
 
 **decisions_summary guide**: Compress each `<decisions>` body item to 10–20 words. Leave empty if body is empty.
 
