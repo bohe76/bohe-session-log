@@ -1,6 +1,10 @@
 # bohe-session-log
 
-Persistent session memory for AI coding assistants — log what you did, resume instantly next session.
+**Persistent memory for AI coding agents — your next session picks up exactly where the last one left off.**
+
+AI coding agents forget everything when a session ends. You burn the first 20 minutes re-explaining what you built, what you decided, and what's still open — and the agent *still* repeats mistakes you already ruled out.
+
+**bohe-session-log** ends every session with a structured, searchable log that the *next* session reads automatically — decisions, pivots, open questions, and TODOs, restored in seconds. Just a git hook plus two skills; no database, no service, no lock-in.
 
 Works on **macOS / Linux / Windows** with **Claude Code**, **Codex**, **Cursor**, **Gemini CLI**, and **Antigravity CLI**.
 
