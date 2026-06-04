@@ -144,6 +144,26 @@ related_sessions: [{previous related session filenames or numbers}]
 | `<todos>` | Next session TODOs | Work to start immediately next session. Checkbox format | ❌ Required |
 | `<files>` | Changes outside git | **Only changes git doesn't track** — global (`~/.claude`·`~/.git-hooks`), memory, releases/tags, other repos. Committed repo files are delegated to `git log` (no duplication) | ⭕ Omit tag if empty |
 
+## Body Compression (100% information preserved)
+
+Write the body tags (`<done>`/`<decisions>`/`<open>`/`<todos>`, etc.) as **keyword-compressed form, not prose**. Since this log is primarily for the next session's Claude to parse (see opening principle), packing the same facts into fewer tokens is advantageous. Measured: same log, prose → compressed ≈ **−17%** tokens (beats full English translation's −13.4%, with zero search/readability cost).
+
+**Two distinct axes** — `<done>`'s "key narrative summary" is about *what to include* (information selection); compression is about *how to express what's included* (expression). Separate axes. Compression **only trims expression — facts, decisions, and rationale are never dropped**.
+
+**Rules**:
+1. Sentences → keywords/bullets. Drop particles, connectives, redundant modifiers
+2. Trim expression only; never drop facts/decisions/rationale — dropping is a compression failure
+3. **Preserve verbatim (no abbreviation)** — strings whose form carries meaning, kept as-is: code identifiers (`OrderListItem`), file paths, commit hashes (`73b9eee`), API paths, numbers/versions, function names + error messages, user quotes, command/log strings
+4. Express causation with `→` (cause → effect)
+5. **Keep the language** (no translation to another language) — for semantic/grep/wiki search consistency
+6. Frontmatter is already compact → unchanged
+
+**before/after** (same content):
+```
+prose:       Resolved the issue where the partner column was empty on the FE because partner_name was not returned, by adding partner_name to OrderListItem
+compressed:  OrderListItem partner_name missing → FE partner column empty → fixed by adding partner_name
+```
+
 ## Frontmatter Field Guide
 
 | Field | Content | Search use | Example |

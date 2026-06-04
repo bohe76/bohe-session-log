@@ -4,6 +4,13 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [1.10.0] — 2026-06-04
+
+### bohe-session-log
+- **Body compression guide — prose → keyword-compressed form** — codifies writing the body tags (`<done>`/`<decisions>`/`<open>`/`<todos>`, etc.) as keyword-compressed form rather than prose. Measured: same log, prose → compressed ≈ **−17%** tokens (beats full English translation's −13.4%, with zero search/readability cost; tiktoken o200k_base). Key design: `<done>`'s "key narrative summary" is the *information-selection* axis, compression is the *expression* axis — separate, so compression **only trims expression and never drops facts/decisions/rationale**. Six rules (drop particles/connectives, preserve all information, keep identifiers/paths/hashes/versions + error messages/quotes/command strings verbatim, express causation with `→`, keep the language, frontmatter unchanged) + one before/after example. Frontmatter schema and 7-tag set unchanged; no effect on bohe-session-start (read-only)
+
+---
+
 ## [1.9.1] — 2026-06-01
 
 ### bohe-session-log
