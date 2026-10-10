@@ -28,7 +28,7 @@ If this skill file has already been read in the current session and has not chan
 ## Draft (raw material)
 
 Always check `session.draft.md` before ending the session.
-- Exists: read it as raw material, and after the log is saved, reset it to an empty file
+- Exists: read it as raw material, and after the log passes verification (Step 2.5), reset it to an empty file
 - Missing or empty: write the log from the conversation context alone (normal case)
 
 The draft is the accumulation of stubs that the installed git post-commit hook appends on every commit. Each stub carries **only the commit message** (no LLM — only what git knows). Format:
@@ -74,7 +74,7 @@ After checking `git status`:
 2. **Gather raw material** — `session.draft.md` + conversation context. The draft is a single file, so **tell branches apart by the `branch:` field in each stub header** and fold only the current branch's stubs into this log. **If the session was compacted (context compression) at any point**, the current context is a summary and details are missing → follow `references/transcript_recovery.md` in this skill's folder to read the current session's transcript (unnecessary on a normal end)
 3. **Write** — fill in per §Template, §Section guide and §Frontmatter guide. **Save directly, without proposing a draft** (do not ask the user). Short or simple sessions are written by the main agent itself. Delegate to a helper worker only when delegation actually improves the write-up quality or the context cost; the delegation prompt must then include: branch, next number, today's date; the draft's absolute path; a core summary of the conversation (tag-classification hints + entities/tags/decisions_summary hints); the obligation to follow this skill's guides; the output absolute path
 4. **Verify (main agent)** — required frontmatter fields, matching XML tag pairs, file name consistency
-5. **Reset the draft (main agent, after verification passes)** — overwrite with an empty file. Never empty it before verifying (a failed write would lose the raw material)
+5. **Reset the draft (main agent, after verification passes)** — overwrite with an empty file. Never empty it before verifying (a failed write would lose the raw material). If the draft held stubs from other branches, say so in one line (branch + count) before resetting — they vanish with the reset, though the commit messages themselves remain in git
 
 ### Step 3 — End
 
