@@ -16,20 +16,25 @@ If this skill file has already been read in the current session and has not chan
 
 ## Location and file names
 
-`docs/session-log/` under the project root. If it does not exist, Step 0 of the session-end workflow creates it. Session logs and the draft are personal work records and are excluded from git tracking. Prefer **`.git/info/exclude`** (local only, leaves no trace in a public repo); if `.gitignore` already ignores them, leave it as is.
+**One store per repository — the main worktree's `docs/session-log/`.** The main worktree is the path on the first line of `git worktree list --porcelain` (git always lists the main worktree first). Work done in a linked worktree writes its logs and drafts there too → they survive `git worktree remove`, and the main checkout sees every branch's logs. Resolve the store in the same order as the hook: ① the main path has `docs/session-log/` → that; ② otherwise the current root has it → that (a v1 worktree-local store — migrate it); ③ neither → no store yet, and Step 0 of the session-end workflow creates it on the main side (in the current root if main is bare; a bare main is not a supported layout — each worktree would get its own store).
 
-**Formal log**: `{branch}-{number}-{YYYY-MM-DD}.md`
-- branch: current git branch name (`/` replaced by `-`; `feature/chat` → `feature-chat`)
+Session logs and drafts are personal work records and are excluded from git tracking. Prefer **`info/exclude`** (local only, leaves no trace in a public repo); if `.gitignore` already ignores them, leave it as is. A tracked log breaks ordering: git deletes and recreates it on every branch checkout, so its mtime jumps and the "latest log" / inflow detection go wrong — tell the user and, with their approval, untrack it with `git rm --cached` in a separate commit (never mixed into the Step 1 work commit; back it up first, since checking out a commit that still tracks it can remove the local copy).
+
+**Formal log**: `{branch}-{number}-{YYYY-MM-DD}.md` (directly in the store)
+- branch: current git branch name (`/` replaced by `-`; `feature/chat` → `feature-chat`). `detached` on a detached HEAD
 - number: 5-digit zero-padded — **max existing number for that branch + 1**. Numbers are **independent per branch** (a feature branch starts at 00001). Several sessions on the same day and branch just increment the number
+- Which branch a log belongs to is decided by an **exact match** `^{branch}-[0-9]{5}-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$` (escape regex metacharacters such as `.` or `+` in the branch name). Never use a prefix glob (`{branch}-*`): `main` would also match `main-v2-*`
 - e.g. `main-00020-2026-04-14.md`, `feature-chat-00001-2026-04-14.md`
 
-**Draft**: `session.draft.md` — a single file regardless of branch, accumulating commit stubs (each stub header records `branch:`)
+**Draft**: `drafts/{branch}.draft.md` — one file per branch. The hook appends a stub on every commit (the header records `branch:`). The file exists = that branch has commits not yet folded into a log
 
 ## Draft (raw material)
 
-Always check `session.draft.md` before ending the session.
-- Exists: read it as raw material, and after the log passes verification (Step 2.5), reset it to an empty file
-- Missing or empty: write the log from the conversation context alone (normal case)
+Always check the current branch's `drafts/{branch}.draft.md` before ending the session.
+- Exists and non-empty: read it as raw material, and after the log passes verification (Step 2.5) delete the file
+- Missing: write the log from the conversation context alone (normal case)
+- Never touch other branches' draft files — they are the raw material of those branches' sessions
+- If a legacy single `session.draft.md` or a `{branch}.draft.md` directly in the store is still present, or the store resolved to case ② (a worktree-local store), run "Migrating legacy drafts" in `references/hook_setup.md` of this skill's folder once, then continue
 
 The draft is the accumulation of stubs that the installed git post-commit hook appends on every commit. Each stub carries **only the commit message** (no LLM — only what git knows). Format:
 
@@ -49,13 +54,13 @@ When the user says "end session" or equivalent, follow this order.
 
 Do this before committing, so the hook recognizes this repo from the Step 1 commit onward.
 
-1. Create `docs/session-log/` if missing
-2. Check tracking exclusion: `git check-ignore -q docs/session-log/session.draft.md`
+1. If there is no store (case ③), create `docs/session-log/` in the main worktree. Even when running inside a linked worktree, create it **on the main side** (in the current root if main is bare)
+2. Check tracking exclusion, against the worktree that holds the store: `git -C <repo root of the store> check-ignore -q docs/session-log/drafts/{branch}.draft.md`
    - Already ignored → skip
-   - Otherwise add one line `docs/session-log/` to **`.git/info/exclude`** (not `.gitignore`)
-   - ⚠️ **Always check with the file path.** Checking the directory path (`docs/session-log/`) misreports "not ignored" as soon as any git-tracked file exists inside it (you would add an info/exclude entry that is not needed)
+   - Otherwise add one line `docs/session-log/` to the file returned by `git -C <repo root of the store> rev-parse --path-format=absolute --git-path info/exclude` (not `.gitignore`). Inside a linked worktree this is the absolute path of the main repo's shared exclude — a worktree's `.git` is a file, so a literal `.git/info/exclude` path does not exist there, and without `--path-format` the command returns a cwd-relative path
+   - ⚠️ **Always check with the file path.** Checking the directory path (`docs/session-log/`) misreports "not ignored" as soon as any git-tracked file exists inside it (you would add an exclude entry that is not needed)
 
-Where the global hook is installed, this step "activates" the repo: from now on **every tool's commits are caught by the hook**. Commits made before activation are missing only from the draft; the formal log is written from the conversation context, so nothing is lost.
+Where the global hook is installed, this step "activates" the repo: from now on **commits from every worktree and every tool are caught by the hook**. Commits made before activation are missing only from the draft; the formal log is written from the conversation context, so nothing is lost.
 
 ### Step 1 — Commit the work files
 
@@ -63,18 +68,18 @@ After checking `git status`:
 - Changes present → add and commit **work files only** (exclude session logs and the draft). The hook appends a stub to the draft
 - No changes → skip the commit
 
-**Continue even if no hook is installed.** The draft is simply empty; the log is written from the conversation context. If this session made commits but the draft is empty, mention in one line that the hook may not be running (not installed, or a repo-local `core.hooksPath` shadows the global hook), and follow `references/hook_setup.md` in this skill's folder only if the user wants it checked or installed. Never install just because the session is ending.
+**Continue even if no hook is installed.** The draft is simply empty; the log is written from the conversation context. If this session made commits but the current branch's draft file does not exist, mention in one line that the hook may not be running (not installed, or a repo-local `core.hooksPath` shadows the global hook), and follow `references/hook_setup.md` in this skill's folder only if the user wants it checked or installed. Never install just because the session is ending.
 
 ### Step 2 — Write the session log
 
-1. **New file vs update** — look at the current branch's latest log (`{branch}-*.md`):
+1. **New file vs update** — look at the current branch's latest log (chosen by exact match):
    - Latest file is **today** + **same context** → update the existing file (§Update mode)
    - Today but different context, or a past date → new file with number +1 (today's date)
    - Context test: update if the existing `<done>` continues into the current work or the existing `<todos>` are being executed; new file if the topic (screen/feature/subject) is entirely different
-2. **Gather raw material** — `session.draft.md` + conversation context. The draft is a single file, so **tell branches apart by the `branch:` field in each stub header** and fold only the current branch's stubs into this log. **If the session was compacted (context compression) at any point**, the current context is a summary and details are missing → follow `references/transcript_recovery.md` in this skill's folder to read the current session's transcript (unnecessary on a normal end)
+2. **Gather raw material** — `drafts/{branch}.draft.md` + conversation context. **If the session was compacted (context compression) at any point**, the current context is a summary and details are missing → follow `references/transcript_recovery.md` in this skill's folder to read the current session's transcript (unnecessary on a normal end)
 3. **Write** — fill in per §Template, §Section guide and §Frontmatter guide. **Save directly, without proposing a draft** (do not ask the user). Short or simple sessions are written by the main agent itself. Delegate to a helper worker only when delegation actually improves the write-up quality or the context cost; the delegation prompt must then include: branch, next number, today's date; the draft's absolute path; a core summary of the conversation (tag-classification hints + entities/tags/decisions_summary hints); the obligation to follow this skill's guides; the output absolute path
 4. **Verify (main agent)** — required frontmatter fields, matching XML tag pairs, file name consistency
-5. **Reset the draft (main agent, after verification passes)** — overwrite with an empty file. Never empty it before verifying (a failed write would lose the raw material). If the draft held stubs from other branches, say so in one line (branch + count) before resetting — they vanish with the reset, though the commit messages themselves remain in git
+5. **Reset the draft (main agent, after verification passes)** — **delete** `drafts/{branch}.draft.md` (do not leave an empty file; a remaining file is the marker of a branch that ended without a log). Never delete it before verifying (a failed write would lose the raw material). Do not touch other branches' files
 
 ### Step 3 — End
 

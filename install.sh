@@ -117,7 +117,7 @@ echo "      See skills/bohe-session-log/references/hook_setup.md for the 2-line 
 echo ""
 echo "Quick test (in a repo that has docs/session-log/ — create it to opt in):"
 echo "  mkdir -p docs/session-log && git commit --allow-empty -m 'test hook'"
-echo "  cat docs/session-log/session.draft.md   # should have one stub entry"
+echo "  cat docs/session-log/drafts/<branch>.draft.md   # should have one stub entry"
 echo ""
 echo "Triggers:"
 echo "  bohe-session-log   — 'end session', 'save session', '세션 종료'"

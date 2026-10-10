@@ -20,13 +20,19 @@ A skill for **the running agent to internalize the project state** when a new co
 
 ## Context-load mode (default)
 
-Common definitions — **"latest log"** = the newest file by **mtime** among `docs/session-log/*.md`, **excluding** `*.draft.md`. **Branch name** = `git branch --show-current` with `/` replaced by `-`.
+**Common definitions**
+- **Store** = the main worktree's `docs/session-log/` (the path on the first line of `git worktree list --porcelain`). Resolve it in the same order as the hook: ① the main path has it → that; ② otherwise the current root has it → that; ③ neither → no store (this skill never creates one). Read it from any worktree — all worktrees share one store
+- **Log files** = the files directly in the store that match `^.+-[0-9]{5}-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$` (**excluding** the `drafts/` subfolder, legacy `*.draft.md` and any other md). **"Latest log"** = the newest of them by **mtime**
+- **Branch name** = `git branch --show-current` with `/` replaced by `-` (`detached` on a detached HEAD). Which branch a log belongs to is decided by an **exact match** `^{branch}-[0-9]{5}-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$` (escape regex metacharacters in the branch name; never a prefix glob — `main` would also match `main-v2-*`)
+- **My draft** = `drafts/{branch}.draft.md`
 
 ### 0. Unfinished-session detection
 
-Compare the mtime of `docs/session-log/session.draft.md` with the latest log. The previous session counts as unfinished when **both** hold:
-1. The draft file exists and is **not empty**
-2. There is **no session log at all**, **or** the draft is newer than the latest log
+Compare my draft (`drafts/{branch}.draft.md`) with **the current branch's** latest log. The previous session counts as unfinished when **both** hold:
+1. My draft file exists and is **not empty**
+2. The current branch has **no log at all**, **or** my draft is newer than the current branch's latest log
+
+Other branches' drafts are not considered here (they appear in 1.5 as leftover drafts).
 
 **When detected**, offer one line to the user:
 > "The previous session doesn't seem to have been closed. Write the session log now?"
@@ -43,7 +49,7 @@ Read two layers into the agent's own working memory. Do not list each layer's co
 #### L1 — previous session (only the part after `<done>`)
 
 **Current branch's newest first, falling back to the global newest by mtime** (draft excluded in all cases):
-- Newest by mtime among the current branch's logs (`{branch}-*.md`) → L1
+- Newest by mtime among the current branch's logs (exact match) → L1
 - None → the global latest log → L1. Its frontmatter `branch` may differ from the current branch → note "continuing work from another branch ({branch})" in the user output
 - None at all → "no previous session log"
 
@@ -65,7 +71,17 @@ Read two layers into the agent's own working memory. Do not list each layer's co
 
 From the frontmatter (between the first `---` and the second `---` at the top) of the **global second-newest** log by mtime (any branch, draft excluded), extract only the `decisions_summary` field. If the YAML list spans several lines, include only its indented items. If there is no second file, skip silently.
 
-L1 is branch-first while L2 is global-second — an asymmetry: if another branch holds a newer log, that session's decisions may be caught by neither L1 nor L2 (accepted; L2's purpose is "backstop decisions from the session before the previous one", so it stays branch-agnostic). If L2 conflicts with the current code/files, **trust the current state** — the record is a past snapshot.
+L1 is branch-first while L2 is global-second — an asymmetry (L2's purpose is "backstop decisions from the session before the previous one", so it stays branch-agnostic). Recent work on other branches is picked up separately by 1.5 below. If L2 conflicts with the current code/files, **trust the current state** — the record is a past snapshot.
+
+#### 1.5 — Inflow (what happened on other branches / worktrees)
+
+Learn, from frontmatter only, what happened on other branches since you last left this one. When a session starts on main, work merged in from feature branches shows up here.
+
+- **Candidates** = log files of other branches whose mtime is **newer than the current branch's latest log**. If the current branch has no log yet (fresh branch), all other-branch logs are candidates, minus the one adopted as L1
+- Newest first by mtime, **at most 5**. Read only `tldr` and `decisions_summary` from each frontmatter (no body)
+- **Merge flag**: the file-name prefix has `/` replaced by `-`, so apply the same replacement to each branch from `git for-each-ref --format='%(refname:short)' refs/heads` and find the match. If found, `git merge-base --is-ancestor <that branch> HEAD` — exit 0 "merged", 1 "not merged", anything else: omit the flag (a squash-merged branch shows as "not merged"). If not found → "branch deleted"
+- **Leftover drafts**: non-empty files in `drafts/` other than the current branch → `{branch} (N stubs) [in progress|no log]`. If that branch appears in a `branch refs/heads/…` line of `git worktree list --porcelain` (compare the name after `refs/heads/` with the same `/`→`-` replacement), it is **in progress** in another worktree; otherwise **no log** (a worktree removed without ending its session). `detached` and `legacy` are not branches — list them as they are. To fold a leftover draft into a log, run the session end in a session that has that branch checked out (file name, number and the draft to delete all derive from that branch) — never write it from here. If the branch no longer exists or the file is `legacy`, there is nothing to check out: the user reviews the content and deletes the file by hand (the commit messages remain in git)
+- May overlap with L2 (accepted). Absorb `decisions_summary` internally; the user output gets only the two template lines below
 
 ### 2. User output (one compressed paragraph + TODOs)
 
@@ -77,6 +93,8 @@ After absorbing L1–L2, report to the user **briefly**. No long summaries.
 Continuing from session {N} ({date}, {stage}) — {tldr}.
 Prior decisions: {core of the L2 decisions_summary — omit this line if none}.
 {N} commits since the log{summarize 1–2 in parentheses only if important}.
+Inflow from other branches: {branch}-{number} — {tldr} [merged|not merged|branch deleted] {up to 5 lines}
+Leftover drafts: {branch} ({N} stubs) [in progress|no log]{, …}
 
 ### Today's TODOs
 - [ ] {TODO 1}
@@ -88,7 +106,7 @@ Tell me which task to proceed with, or give me a different one.
 - The body is only the template lines above — a one-glance view of the state to continue
 - "Commits since the log" = commits on the current branch after the L1 log file's mtime (count with `git log --since=<L1 mtime> --oneline`). Omit the line when it is 0
 - Details of `<done>`, `<decisions>`, `<blockers>` are not included in the user output (agent-internal only)
-- Omit the unfinished-session line if nothing was detected. TODOs come from L1's `<todos>`; if none, replace with "tell me what to work on"
+- Omit the unfinished-session line if nothing was detected. Omit the inflow / leftover-draft lines too when there is nothing to list. TODOs come from L1's `<todos>`; if none, replace with "tell me what to work on"
 - If there is no session log at all: "No previous session log — new project or new branch", then wait for instructions
 
 ### 3. Ready (wait)
@@ -100,7 +118,7 @@ Wait for the user's instruction. **Never start work first** — even with `<todo
 For **log search requests** such as "find sessions about X", "search the session logs for Y", "when did we decide Z", answer with **a frontmatter grep instead of a full load**. A search request does not trigger the L1–L2 load. After presenting results, switch to context-load mode only when the user says "continue from this session".
 
 1. **Map the query to fields**: domain/feature keyword → `tags:`; component/module/file name → `entities:`; decision wording → `decisions_summary:`; free text → `tldr:`; unclear → all four fields
-2. **Grep frontmatter only** — in `docs/session-log/*.md`, combine the field's leading line with the query. If a YAML list spans several lines, use a multiline pattern (`^tags:.*\n(  - .*\n)*.*{query}`) to reach inside the list
+2. **Grep frontmatter only** — in the store's log files, combine the field's leading line with the query. If a YAML list spans several lines, use a multiline pattern (`^tags:.*\n(  - .*\n)*.*{query}`) to reach inside the list
 3. **Legacy fallback** — old-format logs lack `tags`/`entities`/`decisions_summary`/`related_sessions` and are missed by the first grep. In order:
    - 1st: grep `tags:`·`entities:`·`decisions_summary:` (new format)
    - 0 hits → 2nd: grep `tldr:` (common to old and new formats)
@@ -115,4 +133,4 @@ For **log search requests** such as "find sessions about X", "search the session
 - This skill is **read-only** — it never modifies or creates session logs
 - In context-load mode, L1 is a read of the part after `<done>`. Do not summarize from the frontmatter alone, and do not read everything including `<done>`
 - Do not volunteer detailed summaries. Expand only when the user asks for "more detail"
-- **Git worktrees are independent session spaces**: each worktree's `docs/session-log/` is physically isolated. Search only the logs in the current worktree. If another worktree's logs are needed, read them by specifying that worktree's path explicitly
+- **Git worktrees share the store**: every worktree's logs and drafts land in the main worktree's `docs/session-log/`. Run from any worktree, this skill reads that store, and other worktrees' progress shows up through 1.5 (inflow / leftover drafts)

@@ -39,14 +39,14 @@ The hook is opt-in per repository: it only fires where `docs/session-log/` exist
 cd <any git repo>
 mkdir -p docs/session-log
 git commit --allow-empty -m "test hook"
-cat docs/session-log/session.draft.md   # should contain a stub entry
+cat docs/session-log/drafts/<branch>.draft.md   # should contain a stub entry
 ```
 
 If you see `## [HH:MM] test hook <!-- sha:… branch:… -->`, the hook is working.
 
 ## Requirements
 
-- `git` 2.9+
+- `git` 2.31+ (`git branch --show-current`, `git rev-parse --path-format`)
 - `bash` (Git Bash on Windows is fine) OR PowerShell 5.1+ for `install.ps1`
 - One of: Claude Code, Codex, Cursor, Antigravity CLI, or Grok (optional — the hook works without any AI tool)
 
@@ -56,15 +56,20 @@ A git hook captures every commit into a rolling draft. At session end, your AI w
 
 ```
 git commit
-  → hook appends a commit-message stub to docs/session-log/session.draft.md
+  → hook appends a commit-message stub to docs/session-log/drafts/<branch>.draft.md
 
 "end session" / "save session"
-  → AI writes a formal session log from draft + conversation
+  → AI writes a formal session log from draft + conversation, then deletes the draft
 
 "session start" / "where were we"
   → AI loads previous decisions, open questions, and TODOs
+  → plus what other branches / worktrees did since (frontmatter only)
   → ready to continue
 ```
+
+### Branches and worktrees
+
+There is **one store per repository**: the `docs/session-log/` of the **main worktree**. Linked worktrees write their drafts and logs there too, so nothing is lost when a worktree is removed, and a session on `main` sees every branch's logs. Logs are named per branch (`<branch>-<number>-<date>.md`, numbering independent per branch) and drafts are one file per branch (`drafts/<branch>.draft.md`), so concurrent worktrees never write to the same file. At session start the agent lists other-branch logs newer than your branch's last log (with a merged / not-merged flag) and any leftover branch drafts (in progress in another worktree, or ended without a log).
 
 ## Skills
 
@@ -129,7 +134,7 @@ related_sessions: [main-00004-2026-04-18]
 <files>- path/to/file.ts — what changed</files>
 ```
 
-Logs live in `docs/session-log/` which is gitignored — personal records stay local.
+Logs live in `docs/session-log/` of the main worktree, which is gitignored — personal records stay local and must stay untracked (a tracked log gets its mtime bumped on every checkout and breaks "latest log" ordering).
 
 ## Uninstall
 
@@ -175,7 +180,7 @@ skills/
     SKILL.md
     references/
       transcript_recovery.md    — crash / compaction recovery procedure
-      hook_setup.md             — hook install, verify, repo-local hooksPath chaining
+      hook_setup.md             — hook install, verify, repo-local hooksPath chaining, legacy draft migration
     hooks/
       post-commit.sh            — copied to ~/.bohe-session-log/ by installer
   bohe-session-start/

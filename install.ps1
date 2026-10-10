@@ -141,7 +141,7 @@ Write-Host ''
 Write-Host 'Quick test (in a repo that has docs/session-log/ — create it to opt in):'
 Write-Host '  New-Item -ItemType Directory -Force docs/session-log | Out-Null'
 Write-Host '  git commit --allow-empty -m "test hook"'
-Write-Host '  Get-Content docs/session-log/session.draft.md   # should have one stub entry'
+Write-Host '  Get-Content docs/session-log/drafts/<branch>.draft.md   # should have one stub entry'
 Write-Host ''
 Write-Host 'Triggers:'
 Write-Host "  bohe-session-log   — 'end session', 'save session', '세션 종료'"
