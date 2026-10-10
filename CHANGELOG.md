@@ -4,7 +4,7 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
-## [Unreleased]
+## [2.0.0] — 2026-10-10
 
 ### One store per repository — branches and worktrees (hook + both skills)
 - **The store is the main worktree's `docs/session-log/`** — the hook, bohe-session-log and bohe-session-start all resolve it from the first line of `git worktree list --porcelain`. Commits and logs from linked worktrees collect in the main checkout, so they survive `git worktree remove` (measured: a worktree holding only ignored logs is removed without `--force`, taking the logs with it) and a session on main sees every branch. Resolution order is identical in the hook and both skills: main has the store → main; otherwise the current root has it → current root (a v1 worktree-local store, migration target); neither → none (Step 0 creates it on main). A bare main is flagged as unsupported rather than handled
