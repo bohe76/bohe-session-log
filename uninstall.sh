@@ -2,7 +2,8 @@
 # bohe-session-log uninstaller (macOS / Linux / Windows-via-Git-Bash)
 #
 # Removes:
-#   - Skills from ~/.claude/skills/ and ~/.codex/skills/
+#   - Skills from every supported tool's skills dir
+#     (~/.claude, ~/.codex, ~/.cursor, ~/.gemini/antigravity-cli, ~/.grok)
 #   - Stable hook script in ~/.bohe-session-log/
 #   - Hook delegation lines from $(core.hooksPath)/post-commit
 #
@@ -20,10 +21,15 @@ STABLE_DIR="$HOME/.bohe-session-log"
 echo "bohe-session-log uninstaller"
 echo "============================"
 
-# ── 1. Skills: Claude Code ──────────────────────────────────────────────────
-for tool_dir in ".claude" ".codex"; do
-  TARGET="$HOME/$tool_dir/skills"
-  if [ -d "$TARGET/bohe-session-log" ] || [ -d "$TARGET/bohe-session-start" ]; then
+# ── 1. Skills ───────────────────────────────────────────────────────────────
+for TARGET in \
+  "$HOME/.claude/skills" \
+  "$HOME/.codex/skills" \
+  "$HOME/.cursor/skills" \
+  "$HOME/.gemini/antigravity-cli/skills" \
+  "$HOME/.grok/skills"; do
+  if [ -e "$TARGET/bohe-session-log" ] || [ -e "$TARGET/bohe-session-start" ]; then
+    # rm -rf on a symlink removes the link itself, not what it points to.
     rm -rf "$TARGET/bohe-session-log" "$TARGET/bohe-session-start"
     echo "✓ Skills       → removed from $TARGET"
   fi

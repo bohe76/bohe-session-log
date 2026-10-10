@@ -1,6 +1,6 @@
 #!/bin/bash
 # bohe-session-log installer (macOS / Linux / Windows-via-Git-Bash)
-# Supports: Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, and any git-based workflow.
+# Supports: Claude Code, Codex, Cursor, Antigravity CLI, Grok, and any git-based workflow.
 #
 # Design:
 #   - Hook script is copied to a STABLE location (~/.bohe-session-log/)
@@ -8,6 +8,8 @@
 #   - Existing core.hooksPath is RESPECTED — we install into the user's
 #     existing hooks directory rather than overwriting their config.
 #   - Existing post-commit hook is APPENDED to, not overwritten.
+#   - Skills are installed only for tools detected on this machine.
+#   - An existing skill folder (or symlink) is replaced, never nested into.
 #
 # Usage:
 #   bash install.sh
@@ -22,7 +24,21 @@ HOOK_SRC_REPO="$SKILLS_SRC/bohe-session-log/hooks/post-commit.sh"
 STABLE_DIR="$HOME/.bohe-session-log"
 STABLE_HOOK="$STABLE_DIR/post-commit.sh"
 
+SKILL_NAMES="bohe-session-log bohe-session-start"
 SKILLS_INSTALLED=0
+
+# install_skills <skills-dir> <label>
+install_skills() {
+  local target="$1" label="$2" name
+  mkdir -p "$target"
+  for name in $SKILL_NAMES; do
+    # rm -rf on a symlink removes the link itself, not what it points to.
+    rm -rf "${target:?}/$name"
+    cp -r "$SKILLS_SRC/$name" "$target/$name"
+  done
+  printf '✓ %-12s → %s\n' "$label" "$target"
+  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
+}
 
 echo "bohe-session-log installer"
 echo "=========================="
@@ -33,57 +49,14 @@ cp "$HOOK_SRC_REPO" "$STABLE_HOOK"
 chmod +x "$STABLE_HOOK"
 echo "✓ Hook script  → $STABLE_HOOK"
 
-# ── 2. Skills: Claude Code ──────────────────────────────────────────────────
-if [ -d "$HOME/.claude" ]; then
-  TARGET="$HOME/.claude/skills"
-  mkdir -p "$TARGET"
-  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
-  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
-  echo "✓ Claude Code  → $TARGET"
-  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
-fi
+# ── 2. Skills: one copy per detected tool ───────────────────────────────────
+[ -d "$HOME/.claude" ]                 && install_skills "$HOME/.claude/skills"                 "Claude Code"
+[ -d "$HOME/.codex" ]                  && install_skills "$HOME/.codex/skills"                  "Codex"
+[ -d "$HOME/.cursor" ]                 && install_skills "$HOME/.cursor/skills"                 "Cursor"
+[ -d "$HOME/.gemini/antigravity-cli" ] && install_skills "$HOME/.gemini/antigravity-cli/skills" "Antigravity"
+[ -d "$HOME/.grok" ]                   && install_skills "$HOME/.grok/skills"                   "Grok"
 
-# ── 3. Skills: Codex ────────────────────────────────────────────────────────
-if [ -d "$HOME/.codex" ]; then
-  TARGET="$HOME/.codex/skills"
-  mkdir -p "$TARGET"
-  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
-  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
-  echo "✓ Codex        → $TARGET"
-  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
-fi
-
-# ── 4. Skills: Cursor ───────────────────────────────────────────────────────
-if [ -d "$HOME/.cursor" ]; then
-  TARGET="$HOME/.cursor/skills"
-  mkdir -p "$TARGET"
-  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
-  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
-  echo "✓ Cursor       → $TARGET"
-  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
-fi
-
-# ── 5. Skills: Gemini CLI ───────────────────────────────────────────────────
-if [ -d "$HOME/.gemini" ]; then
-  TARGET="$HOME/.gemini/skills"
-  mkdir -p "$TARGET"
-  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
-  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
-  echo "✓ Gemini CLI   → $TARGET"
-  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
-fi
-
-# ── 6. Skills: Antigravity CLI ──────────────────────────────────────────────
-if [ -d "$HOME/.antigravity" ]; then
-  TARGET="$HOME/.antigravity/skills"
-  mkdir -p "$TARGET"
-  cp -r "$SKILLS_SRC/bohe-session-log" "$TARGET/"
-  cp -r "$SKILLS_SRC/bohe-session-start" "$TARGET/"
-  echo "✓ Antigravity  → $TARGET"
-  SKILLS_INSTALLED=$((SKILLS_INSTALLED + 1))
-fi
-
-# ── 7. Git hook — respect existing config, append don't overwrite ───────────
+# ── 3. Git hook — respect existing config, append don't overwrite ───────────
 EXISTING_HOOKS_PATH="$(git config --global --get core.hooksPath 2>/dev/null || true)"
 if [ -n "$EXISTING_HOOKS_PATH" ]; then
   HOOK_DIR="$EXISTING_HOOKS_PATH"
@@ -132,16 +105,19 @@ fi
 # ── Summary ─────────────────────────────────────────────────────────────────
 echo ""
 if [ "$SKILLS_INSTALLED" -eq 0 ]; then
-  echo "⚠ No supported AI tool detected (~/.claude / ~/.codex / ~/.cursor / ~/.gemini / ~/.antigravity)."
+  echo "⚠ No supported AI tool detected (~/.claude / ~/.codex / ~/.cursor / ~/.gemini/antigravity-cli / ~/.grok)."
   echo "  Skills were not installed. Git hook works regardless of AI tool."
 else
   echo "Done. Restart your AI tool to activate the skills."
 fi
 
 echo ""
-echo "Quick test:"
-echo "  cd <any git repo> && git commit --allow-empty -m 'test hook'"
-echo "  cat docs/session-log/<branch>.draft.md   # should have one stub entry"
+echo "Note: a repo-local core.hooksPath (husky, .githooks, ...) shadows the global hook."
+echo "      See skills/bohe-session-log/references/hook_setup.md for the 2-line chain call."
+echo ""
+echo "Quick test (in a repo that has docs/session-log/ — create it to opt in):"
+echo "  mkdir -p docs/session-log && git commit --allow-empty -m 'test hook'"
+echo "  cat docs/session-log/session.draft.md   # should have one stub entry"
 echo ""
 echo "Triggers:"
 echo "  bohe-session-log   — 'end session', 'save session', '세션 종료'"

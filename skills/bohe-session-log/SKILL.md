@@ -1,89 +1,84 @@
 ---
 name: bohe-session-log
 description: >-
-  Writes or updates a session log so work can continue seamlessly in the next session.
-  Triggers on keywords: "session log", "save session", "end session", "session off",
-  "wrap up session", "session done", "세션로그", "세션 종료", "세션종료".
-  Commit-time draft stubs are appended automatically by the git post-commit hook;
-  the formal session log is written by this skill on a session-end request.
+  Writes the session log at session end so the next session can pick up where this one left off. Use on requests like "end session", "save session", "wrap up", "session off", "세션 종료", "세션 저장", "세션 마무리", "세션오프". Commit stubs are appended to the draft automatically by the git post-commit hook; this skill writes the formal session log when the user asks to end the session.
 ---
 
-# bohe-session-log: Session Log Management
+# bohe-session-log: Writing the session log
 
-Records each session's work (discussions + implementation) so the next session can resume without any gap.
+Records what the session did (discussion + implementation) so the next session continues without a gap.
 
-**Format design principle**: This log is primarily for the next session's Claude to parse accurately. AI parsing accuracy takes priority over human readability — that's why the body uses XML tags for explicit section boundaries, and the frontmatter carries metadata for log search.
+**Format principle**: the top priority is that **the next session's AI agent parses this log exactly**. Parsing accuracy beats human readability. So the body marks section boundaries with XML tags, and the frontmatter carries search metadata.
 
-## Storage Location
+**Trigger**: fires only when the user asks to "end / save / wrap up / record the session". **It does not fire on every commit.** Appending a stub to the draft right after a commit is done by the git post-commit hook with no LLM involved (draft = raw material, formal log = written at session end from the conversation context).
 
-`docs/session-log/` directory at the project root.
+If this skill file has already been read in the current session and has not changed since, do not read it again; reuse the context. This skill neither widens nor narrows the scope the user approved or the project's required verification.
 
-The directory is auto-created if missing. Session logs and drafts are **gitignored** — they are personal work records and should not be git-tracked.
+## Location and file names
 
-## File Naming
+`docs/session-log/` under the project root. If it does not exist, Step 0 of the session-end workflow creates it. Session logs and the draft are personal work records and are excluded from git tracking. Prefer **`.git/info/exclude`** (local only, leaves no trace in a public repo); if `.gitignore` already ignores them, leave it as is.
 
 **Formal log**: `{branch}-{number}-{YYYY-MM-DD}.md`
+- branch: current git branch name (`/` replaced by `-`; `feature/chat` → `feature-chat`)
+- number: 5-digit zero-padded — **max existing number for that branch + 1**. Numbers are **independent per branch** (a feature branch starts at 00001). Several sessions on the same day and branch just increment the number
+- e.g. `main-00020-2026-04-14.md`, `feature-chat-00001-2026-04-14.md`
 
-- Branch: current git branch name (`/` replaced with `-`. e.g. `feature/chat` → `feature-chat`)
-- Number: 5-digit zero-padded (`00001`, `00002`, ...) — **max existing number for that branch + 1**
-- Date: `YYYY-MM-DD` format
-- Examples: `main-00020-2026-04-14.md`, `feature-chat-00001-2026-04-14.md`
+**Draft**: `session.draft.md` — a single file regardless of branch, accumulating commit stubs (each stub header records `branch:`)
 
-**Draft**: `session.draft.md`
-- Single branch-agnostic file; accumulates commit stubs appended by the post-commit hook (branch recorded in stub header)
+## Draft (raw material)
 
-## Behavior
+Always check `session.draft.md` before ending the session.
+- Exists: read it as raw material, and after the log is saved, reset it to an empty file
+- Missing or empty: write the log from the conversation context alone (normal case)
 
-### 1. Create a new session log (default)
-
-Check `docs/session-log/` and decide based on these rules:
-
-1. Extract the current branch name (`git branch --show-current`, `/` → `-`)
-2. Find the latest log file for that branch (`{branch}-*.md`)
-3. Latest file is **today's date** and **same context** → update the existing file (append as history)
-4. Latest file is **today's date** but **different context** → increment number and create a new file
-5. Latest file is **a past date** → increment number and create a new file (with today's date)
-
-**Context judgment criteria:**
-- If existing log's `<done>` and the current session work are continuous → update
-- If currently executing the existing log's `<todos>` → update
-- If covering a completely different screen/feature/topic → new file
-
-### 2. Read the previous session log
-
-At the start of the next session, read the **latest log for the current branch** and:
-- Check `<todos>`
-- Check `<open>`, `<blockers>`
-- Resume work
-
-(See `bohe-session-start` skill for detailed load order)
-
-### 3. Write content
-
-Analyze the current conversation context and `session.draft.md`, then automatically fill in each section of the template below.
-**Save directly without proposing a draft first** (do not ask the user).
-
-#### Using the Draft
-
-Always check `session.draft.md` before ending a session:
-
-- File **exists**: read as raw material for writing the log, then reset after saving (overwrite with empty file)
-- File **does not exist**: write the log from conversation context alone (normal case)
-
-`.draft.md` is a cumulative file of stubs appended by the post-commit hook on every git commit. Each stub holds the **commit message only** (no LLM involved — just what git knows). Format:
+The draft is the accumulation of stubs that the installed git post-commit hook appends on every commit. Each stub carries **only the commit message** (no LLM — only what git knows). Format:
 
 ```
 ## [10:23] feat(studio): AI chat panel to floating <!-- sha:abc123 branch:main -->
 - feat(studio): AI chat panel to floating
 ---
-## [11:45] fix(ChatPanel): block selection context retention bug <!-- sha:def456 branch:main -->
-- fix(ChatPanel): block selection context retention bug
----
 ```
 
-**Parse by splitting on `## [HH:MM]`**. Each stub's commit message goes into the `<done>` tag chronologically. Decisions, pivots, and other context not present in the stub are **extracted from the conversation** and placed in the relevant tags (`<decisions>`, `<pivots>`, etc.).
+**Split on `## [HH:MM]`.** Fold the commit messages into `<done>` in chronological order; information the stubs lack (decisions, pivots, …) is **extracted from the conversation context** into the matching tags (`<decisions>`, `<pivots>`, …). If several days have piled up (crashes, a long stretch without a formal log), treat **the whole draft as raw material** and consolidate it into one formal log — do not treat it as stale.
 
-If the session crashed multiple times or formal logs have been missing for an extended period, the draft may accumulate content across multiple days. In that case, **treat the entire draft as raw material** and consolidate it into a single formal log — do not treat it as stale.
+## Session-end workflow
+
+When the user says "end session" or equivalent, follow this order.
+
+### Step 0 — Ensure the session-log directory (activation)
+
+Do this before committing, so the hook recognizes this repo from the Step 1 commit onward.
+
+1. Create `docs/session-log/` if missing
+2. Check tracking exclusion: `git check-ignore -q docs/session-log/session.draft.md`
+   - Already ignored → skip
+   - Otherwise add one line `docs/session-log/` to **`.git/info/exclude`** (not `.gitignore`)
+   - ⚠️ **Always check with the file path.** Checking the directory path (`docs/session-log/`) misreports "not ignored" as soon as any git-tracked file exists inside it (you would add an info/exclude entry that is not needed)
+
+Where the global hook is installed, this step "activates" the repo: from now on **every tool's commits are caught by the hook**. Commits made before activation are missing only from the draft; the formal log is written from the conversation context, so nothing is lost.
+
+### Step 1 — Commit the work files
+
+After checking `git status`:
+- Changes present → add and commit **work files only** (exclude session logs and the draft). The hook appends a stub to the draft
+- No changes → skip the commit
+
+**Continue even if no hook is installed.** The draft is simply empty; the log is written from the conversation context. If this session made commits but the draft is empty, mention in one line that the hook may not be running (not installed, or a repo-local `core.hooksPath` shadows the global hook), and follow `references/hook_setup.md` in this skill's folder only if the user wants it checked or installed. Never install just because the session is ending.
+
+### Step 2 — Write the session log
+
+1. **New file vs update** — look at the current branch's latest log (`{branch}-*.md`):
+   - Latest file is **today** + **same context** → update the existing file (§Update mode)
+   - Today but different context, or a past date → new file with number +1 (today's date)
+   - Context test: update if the existing `<done>` continues into the current work or the existing `<todos>` are being executed; new file if the topic (screen/feature/subject) is entirely different
+2. **Gather raw material** — `session.draft.md` + conversation context. The draft is a single file, so **tell branches apart by the `branch:` field in each stub header** and fold only the current branch's stubs into this log. **If the session was compacted (context compression) at any point**, the current context is a summary and details are missing → follow `references/transcript_recovery.md` in this skill's folder to read the current session's transcript (unnecessary on a normal end)
+3. **Write** — fill in per §Template, §Section guide and §Frontmatter guide. **Save directly, without proposing a draft** (do not ask the user). Short or simple sessions are written by the main agent itself. Delegate to a helper worker only when delegation actually improves the write-up quality or the context cost; the delegation prompt must then include: branch, next number, today's date; the draft's absolute path; a core summary of the conversation (tag-classification hints + entities/tags/decisions_summary hints); the obligation to follow this skill's guides; the output absolute path
+4. **Verify (main agent)** — required frontmatter fields, matching XML tag pairs, file name consistency
+5. **Reset the draft (main agent, after verification passes)** — overwrite with an empty file. Never empty it before verifying (a failed write would lose the raw material)
+
+### Step 3 — End
+
+After the log is done, just end. No extra guidance needed.
 
 ## Template
 
@@ -95,20 +90,20 @@ date: {YYYY-MM-DD}
 project: {project name}
 stage: {planning / design / implementation / verification / done}
 tldr: {one-line summary}
-tags: [{this session's distinctive topic keywords}]
-entities: [{key component/module/file names}]
-decisions_summary: [{key decisions, one-line each}]
-related_sessions: [{previous related session filenames or numbers}]
+tags: [{topic keywords unique to this session}]
+entities: [{main components/modules/files}]
+decisions_summary: [{one-line summaries of key decisions}]
+related_sessions: [{file names or numbers of related earlier sessions}]
 ---
 
 # Session {number} — {YYYY-MM-DD} ({branch})
 
 <done>
-- (chronological — key narrative summary only: the trunk the next session needs, not everything. Details are backed by transcript & git)
+- (chronological key narrative — only the trunk the next session needs. Not everything; details are backed by the transcript and git)
 </done>
 
 <decisions>
-- Confirmed items (must not be reversed)
+- settled items (must not be reversed)
 </decisions>
 
 <pivots>
@@ -116,195 +111,94 @@ related_sessions: [{previous related session filenames or numbers}]
 </pivots>
 
 <open>
-- Open questions, deferred discussions
+- open questions, parked discussions
 </open>
 
 <blockers>
-- Things awaiting external action or confirmation
+- things needing external action/confirmation
 </blockers>
 
 <todos>
-- [ ] Tasks to start immediately next session
+- [ ] work to start right away
 </todos>
 
 <files>
-- `path/to/file` — what was done (only changes git doesn't track)
+- `path/to/file` — what was done (only changes git does not track)
 </files>
 ```
 
-## Section Writing Guide
+## Section guide
 
-| Tag | Meaning | Content | Can be empty |
-|-----|---------|---------|:---:|
-| `<done>` | What was done | **Key narrative summary** of this session (the trunk of discussions/implementation/debugging — not an exhaustive list; details backed by transcript & git) | ❌ Required |
-| `<decisions>` | Decisions | Confirmed items. Must not be reversed next session | ⭕ Omit tag if empty |
-| `<pivots>` | Direction changes | What changed direction this session and why | ⭕ Omit tag if empty |
-| `<open>` | Unresolved | Questions without answers yet, deferred discussions | ⭕ Omit tag if empty |
-| `<blockers>` | Waiting | User actions, external confirmations, etc. blocking progress | ⭕ Omit tag if empty |
-| `<todos>` | Next session TODOs | Work to start immediately next session. Checkbox format | ❌ Required |
-| `<files>` | Changes outside git | **Only changes git doesn't track** — global (`~/.claude`·`~/.git-hooks`), memory, releases/tags, other repos. Committed repo files are delegated to `git log` (no duplication) | ⭕ Omit tag if empty |
+| Tag | Meaning | Content | May be empty? |
+|------|------|------|:---:|
+| `<done>` | What was done | **Key narrative summary** of this session (the trunk of discussion/implementation/debugging — not an exhaustive list; details are backed by transcript and git) | ❌ required |
+| `<decisions>` | Decisions | Settled items. Must not be reversed in the next session | ⭕ omit the tag if none |
+| `<pivots>` | Direction changes | What changed direction this session and why | ⭕ omit the tag if none |
+| `<open>` | Unresolved | Questions without an answer yet, parked discussions | ⭕ omit the tag if none |
+| `<blockers>` | Waiting | Blockers: user action, external confirmation, … | ⭕ omit the tag if none |
+| `<todos>` | Next-session TODO | Work to start right away next time. Checkbox form | ❌ required |
+| `<files>` | Changes outside git | **Only changes git does not track** — global config (`~/.claude`, `~/.git-hooks`), memory, releases/tags, other repos. Committed repo files are not listed again; `git log --stat` is the source of truth | ⭕ omit the tag if none |
 
-## Body Compression (100% information preserved)
+## Body compression (100% information preserved)
 
-Write the body tags (`<done>`/`<decisions>`/`<open>`/`<todos>`, etc.) as **keyword-compressed form, not prose**. Since this log is primarily for the next session's Claude to parse (see opening principle), packing the same facts into fewer tokens is advantageous. Measured: same log, prose → compressed ≈ **−17%** tokens (beats full English translation's −13.4%, with zero search/readability cost).
+Body tags (`<done>`/`<decisions>`/`<open>`/`<todos>` …) are written in **keyword-compressed form, not prose**. The next session's AI agent parsing this log is the top priority, so carrying the same facts in fewer tokens wins. Measured: same log, prose → compressed ≈ **−17%** tokens (beats a full English translation's −13.4%, with zero search/readability cost).
 
-**Two distinct axes** — `<done>`'s "key narrative summary" is about *what to include* (information selection); compression is about *how to express what's included* (expression). Separate axes. Compression **only trims expression — facts, decisions, and rationale are never dropped**.
+**Two separate axes** — `<done>`'s "key narrative summary" is about *what to include* (information selection); compression is about *how to express what is included* (expression). Compression **only trims expression and never drops facts, decisions or rationale**.
 
 **Rules**:
-1. Sentences → keywords/bullets. Drop particles, connectives, redundant modifiers
-2. Trim expression only; never drop facts/decisions/rationale — dropping is a compression failure
-3. **Preserve verbatim (no abbreviation)** — strings whose form carries meaning, kept as-is: code identifiers (`OrderListItem`), file paths, commit hashes (`73b9eee`), API paths, numbers/versions, function names + error messages, user quotes, command/log strings
-4. Express causation with `→` (cause → effect)
-5. **Keep the language** (no translation to another language) — for semantic/grep/wiki search consistency
+1. Prose sentences → keywords/bullets. Drop particles, connectives, redundant modifiers
+2. Trim expression only; zero loss of facts/decisions/rationale — a loss is a failed compression
+3. **Keep verbatim (no abbreviation)** — any string whose form carries meaning stays as written: code identifiers (`OrderListItem`), file paths, commit hashes (`73b9eee`), API paths, numbers/versions, function names + error messages, user quotes, command/log strings
+4. Causation with `→` (cause → effect)
+5. **Keep the language** of the project (do not translate) — keeps semantic/grep/wiki search consistent
 6. Frontmatter is already compact → unchanged
 
 **before/after** (same content):
 ```
-prose:       Resolved the issue where the partner column was empty on the FE because partner_name was not returned, by adding partner_name to OrderListItem
-compressed:  OrderListItem partner_name missing → FE partner column empty → fixed by adding partner_name
+prose:      The partner name was not returned, so the FE partner column was empty; fixed by adding partner_name to OrderListItem
+compressed: OrderListItem partner_name missing → FE partner column empty → added partner_name, fixed
 ```
 
-## Frontmatter Field Guide
+## Frontmatter field guide
 
 | Field | Content | Search use | Example |
-|-------|---------|-----------|---------|
-| `session` | Number | Identification | `5` |
-| `branch` | Branch name | Identification | `feature-chat` |
-| `date` | Date | Chronological filter | `2026-04-20` |
-| `project` | Project name | Project filter | `my-project` |
-| `stage` | Phase | Phase filter | `implementation` |
-| `tldr` | One-line summary | Preview | — |
-| `tags` | This session's distinctive topics | **Identify this session (in-folder search)** | `[chat, ui, auth]` |
-| `entities` | What this session touched | **What this session worked on** | `[ChatPanel, useAuth]` |
-| `decisions_summary` | Key decisions, one-line summaries | **Decision search** | `["w-[448px] floating fixed", "pnpm adopted"]` |
-| `related_sessions` | Previous related session filenames/numbers | **Session linking** | `[feature-chat-00003-2026-04-14]` |
+|------|------|------|------|
+| `session` | number | identity | `5` |
+| `branch` | branch name | identity | `feature-chat` |
+| `date` | date | chronological sort/filter | `2026-04-20` |
+| `project` | project name (from the current working directory) | project filter | `bohe-session-log` |
+| `stage` | stage; fixed 5 values: planning / design / implementation / verification / done | stage filter | `implementation` |
+| `tldr` | one-line summary | preview | — |
+| `tags` | topic keywords unique to this session | **identify this session (in-folder search)** | `[chat, ui, auth]` |
+| `entities` | components/files this session touched | **what this session touched** | `[ChatPanel, useAuth]` |
+| `decisions_summary` | list of one-line decision summaries | **decision search** | `[w-[448px] floating fixed, adopt pnpm]` |
+| `related_sessions` | list of related earlier session file names/numbers | **link related sessions** | `[feature-chat-00003-2026-04-14]` |
 
-`tags` / `entities` / `decisions_summary` / `related_sessions` are optional but **fill them out as much as possible to improve searchability**. Empty list `[]` is allowed.
+`tags` / `entities` / `decisions_summary` / `related_sessions` are optional but **fill them as fully as possible to maximize searchability**. An empty list `[]` is allowed.
 
-**tags guide**: Session logs are a closed set searched only within `docs/session-log/`. So tags carry only **the topics that distinguish this session from other session logs** — words common to every session (in this repo, skill names like `session-log`/`session-start` themselves) have no discriminative value and are excluded. Favor the concrete topics this session actually covered + version. Remove duplicates. 3–8 items recommended.
+- **tags**: session logs are a closed set searched only within `docs/session-log/`. Carry only **the topics that distinguish this session from the other session logs**. Words common to every session of that project (the project name, skills used every session, …) have no discriminating power — exclude them. Concrete topics + versions, de-duplicated, 3–8 recommended
+- **entities**: the components/modules/files/symbols this session centrally touched, by their real names. Prefer **what is specific to this session** over targets repeated every session
+- **decisions_summary**: each `<decisions>` item compressed to a short phrase. If the body is empty, leave this field empty too
 
-**entities guide**: The components/modules/files/symbols this session actually touched, by their real names. Favor what's specific to this session over common targets that recur every session (grep search also happens within the session-log folder).
+**decisions_summary domain-prefix rule** (important — `bohe-wiki-sync` updates hub pages from it):
+- Each item is `[domain] decision text`. domain = an entry of the project's `.claude/wiki-config.yaml` `domains:` list (auth/partner/order …)
+- A decision spanning several domains is split into several items (no compound prefix like `[auth,partner]`). Decisions outside any domain may use `[general]` or omit the prefix
+- e.g. `"[auth] JWT 24h + refresh 7d"`, `"[partner] block history append-only"`, `"[general] add coverage gate to CI"`
+- Without a prefix the decision is not reflected in the wiki domain hub. The `<decisions>` body is free-form; `decisions_summary` is parsed, so follow the rule
 
-**decisions_summary guide**: Compress each `<decisions>` body item to 10–20 words. Leave empty if body is empty.
+## Update mode (same day · same context)
 
-**Domain prefix convention** (optional but recommended for projects with a wiki):
-- Format each item as `[domain] decision body`
-- domain = a feature area or module name from your project (e.g. auth/api/ui)
-- Split multi-domain decisions into separate items
-- Decisions not tied to a specific domain may use `[general]` or omit the prefix
-- Examples:
-  - `"[auth] JWT 24h + refresh 7d"`
-  - `"[api] pagination cursor-based"`
-  - `"[general] coverage gate added to CI"`
-
-## Session End Workflow
-
-When the user says "end session" or equivalent, follow this sequence:
-
-### Step 1 — Commit work files
-
-Check `git status` for changes:
-- Changes exist → git add + git commit **work files only** (exclude session log and draft)
-  - The post-commit hook automatically appends a stub (commit message) to the draft (no LLM, works on all tools)
-- No changes → skip commit, proceed to step 2
-
-### Step 2 — Write session log
-
-Write the session log by analyzing the current conversation context and the draft file.
-
-**Recommended**: delegate to a sub-agent when the session is long or complex (dozens of commits, multiple domains). For short sessions, write directly.
-
-**Procedure**:
-
-1. Read `session.draft.md` — commit stub entries are the raw material (branch identified from the `branch:` field in each stub header)
-   - **If the session was compacted** → use Transcript Recovery's "Compaction" path: a sub-agent reads the current session's transcript to supplement (stubs are commit messages only, so compacted detail isn't lost)
-2. Fill in the template: classify entries into done/decisions/pivots/open/blockers/todos/files; extract tags/entities/decisions_summary
-3. Write to `docs/session-log/{branch}-{number}-{YYYY-MM-DD}.md`
-4. Reset draft (overwrite with empty file)
-5. Verify result — frontmatter required fields + XML tag pairs + filename consistency
-
-### Step 3 — End
-
-Simply end after log is complete. No need to suggest `/clear`.
-
----
-
-## Transcript Recovery (crash / compaction)
-
-The draft holds commit-message stubs only, so if a session **didn't end gracefully (crash) or was compacted mid-way** (context window compressed), stubs alone make for thin recovery. In that case, **read the conversation transcript from disk** as raw material — the transcript persists in full on disk regardless of compaction/crash.
-
-**Not needed normally** — on a graceful end the conversation context is still live, so no extra read. Fires only in two cases:
-
-- **Compaction** (at session end, Step 2 of this skill): if the session was compacted, the current context is a summary missing detail → read the **current session's transcript** to fill it in
-- **Crash** (at next session start, `bohe-session-start` unfinished detection): the previous session ended with no log → read the **previous session's transcript** to recover
-
-### Finding the transcript
-
-**The currently-running tool finds its own session record** (each CLI writes the conversation to disk):
-- Criteria: the session matching the **current working directory (cwd) + most recently modified (mtime)**
-- Known location hints:
-  - **Claude Code**: `~/.claude/projects/<encoded-cwd>/<session>.jsonl`
-  - **Codex**: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (filter by cwd)
-  - **Antigravity CLI**: find `conversationId` via `workspace`(=cwd) in `~/.gemini/antigravity-cli/history.jsonl` → `~/.gemini/antigravity-cli/brain/<conversationId>/.system_generated/logs/transcript_full.jsonl`
-  - **Other tools**: locate your CLI's session-record directory and apply the same criteria (cwd + latest)
-- If not found → recover from draft stubs only (degraded mode). Don't guess; tell the user "transcript not found, writing from stubs only"
-
-### Token management (don't read the whole thing)
-
-Transcripts can be large (tool calls/results are most of the bytes). Bound the cost:
-- **Scope**: only the range since the last formal log (or last draft stub) — usually one session's worth
-- **Filter**: drop `tool_use`/`tool_result`/attachments **plus** skill-load text (`Base directory for this skill…`), `<system-reminder>`, and slash-command blocks → keep **user input + assistant text only** (Claude jsonl example: extract user/assistant text with `jq`, then `perl -0pe 's/<system-reminder>.*?<\/system-reminder>//gs'`). Measured: 3.4MB → 84KB (~1/40) while preserving recovery quality (Haiku reconstruction 92%)
-- **Sub-agent delegation**: a Haiku/Sonnet sub-agent reads the transcript and organizes it into done/decisions/pivots/… → **main context receives only the result** (protects main tokens)
-- If a summary (compaction summary / rollout summary) exists, prefer it; otherwise use the filtered transcript
-
-Recovery is a **rare event** (only on an un-ended session), so a sub-agent spending tens of K tokens once is acceptable — a normal (graceful) end costs nothing.
-
----
+Never add or delete existing content freely — append in **history form**.
+- Add a `### 갱신 {HH:MM or "afternoon session"}` sub-heading at the **inner end** of each XML tag block that receives new content (never outside the tag; tags with nothing to add get no sub-heading). If the draft spans several times, use the latest time and merge everything into one update section
+- Draft stubs go into the `<done>` update section; decisions extracted from the conversation are appended at the end of `<decisions>`. Existing `<decisions>`/`<pivots>` are kept
+- `<todos>`: strike completed items with `~~strikethrough~~`, then add new ones
+- **Never delete existing content** — even wrong content is preserved with `~~strikethrough~~`
+- Frontmatter: overwrite `stage`/`tldr` with the current state (progress); **merge existing + new** for `tags`/`entities`/`decisions_summary` (de-duplicate)
 
 ## Notes
 
-- Empty sections are **omitted including the XML tag** (do not leave empty tags)
-- Frontmatter `stage` has 5 levels: planning / design / implementation / verification / done
-- Frontmatter `project` uses the current working directory's project name
-- Multiple sessions on the same branch on the same day → increment number only (date may be identical)
-- Numbers are **independent per branch** — feature branches start fresh from 00001
-- **When updating, do not freely add/delete existing content** — always append in history format
-  - Add content inside existing XML tag blocks with a `### Update {HH:MM or "afternoon session"}` subheading (must not go outside the tag)
-  - Keep existing `<decisions>`/`<pivots>` and only add new items
-  - For `<todos>`, mark completed items with `~~strikethrough~~` then add new items
-  - Deleting existing content is absolutely forbidden — even incorrect content must be preserved with `~~strikethrough~~`
-  - **Draft integration in update mode**:
-    - Draft entries (commit stubs) go into `<done>` tag body under `### Update HH:MM` section
-    - Decisions are extracted from the conversation and appended at the end of `<decisions>` tag
-    - Frontmatter `stage`/`tldr` are overwritten to reflect current state
-    - Frontmatter `tags`/`entities`/`decisions_summary` are **merged** with existing (deduplicated)
-    - If draft has multiple time entries, consolidate all under `### Update` with the latest time
-- Do not write code details — only path and summary in `<files>`
-- **`<files>` records only changes git doesn't track** — committed repo files have `git log --stat` as the source of truth, so don't re-list them. Record only what this repo's git diff misses: global config (`~/.claude`·`~/.git-hooks`), memory, releases/tags, other-repo changes
-- **`<decisions>` is the session ADR** — it holds the full story (including the why) of that session's decisions as a log. Only rules that "always apply going forward" are promoted separately to memory (`MEMORY.md`) — decisions (session log) and memory are layers, not duplicates (the log retains content, memory extracts rules). Search via frontmatter `decisions_summary`
-- Reference detailed plans by path only (do not copy content)
-- **No artifact duplication** — content already in PRDs, plans, ADRs, issues, commits, or diffs must not be copied into the body; use path/URL references only (e.g. `details: docs/prd/auth.md#token-policy`)
-- **XML tag notes**:
-  - Tag names are lowercase, no underscores, fixed to the 7 tags above
-  - Always match opening/closing pairs — mismatches will break parsing in the next session
-  - Markdown bullets/checkboxes/strikethrough are all allowed inside tags
-
-## Setup Check (Automatic)
-
-On first invoke, check whether the global git hook is installed:
-
-```bash
-git config --global core.hooksPath  # should point to a directory containing post-commit
-```
-
-- **Hook found** → proceed normally, no output
-- **Hook not found** → notify the user once:
-
-```
-⚠ bohe-session-log: git hook not detected.
-  Commit stubs won't be captured until the hook is installed.
-  Run: bash install.sh  (from the bohe-session-log repo)
-  Or visit: https://github.com/bohe76/bohe-session-log
-```
-
-Do not block normal skill operation — the skill works without the hook (draft-less mode: writes the session log from conversation context only).
+- Omit empty sections **tag and all** (leave no empty tags)
+- No code details — paths and a summary in `<files>` only. **`<files>` records only changes git cannot see** (committed repo files: `git log --stat` is the source of truth)
+- **`<decisions>` is the session ADR** — the log holds the full story of each decision (including the why). Only "rules to apply from now on" are promoted to the agent's persistent memory (e.g. `MEMORY.md`) — a hierarchy, not duplication: the log holds the content, memory extracts the rule. Search via frontmatter `decisions_summary`
+- **No artifact duplication** — content already in a PRD, plan, ADR, issue, commit or diff is referenced by path/URL (`details: docs/prd/auth.md#token-policy`), never copied into the body. Detailed plans: record the plan's path only
+- **XML tags**: lowercase, no underscores, fixed set of the 7 tags above. Always match opening/closing pairs (a mismatch breaks the next session's parsing). Inside a tag, Markdown bullets/checkboxes/strikethrough are all allowed

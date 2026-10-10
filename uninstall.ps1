@@ -9,20 +9,38 @@
 $ErrorActionPreference = 'Stop'
 
 $StableDir = Join-Path $HOME '.bohe-session-log'
+$SkillNames = @('bohe-session-log', 'bohe-session-start')
+$SkillDirs = @(
+  (Join-Path $HOME '.claude\skills'),
+  (Join-Path $HOME '.codex\skills'),
+  (Join-Path $HOME '.cursor\skills'),
+  (Join-Path $HOME '.gemini\antigravity-cli\skills'),
+  (Join-Path $HOME '.grok\skills')
+)
+
+function Remove-ExistingSkill {
+  param([string] $Path)
+  if (-not (Test-Path -LiteralPath $Path)) { return $false }
+  $item = Get-Item -LiteralPath $Path -Force
+  if ($item.LinkType) {
+    # Junction / symlink: delete the link itself, never follow it into the target.
+    $item.Delete()
+  } else {
+    Remove-Item -LiteralPath $Path -Recurse -Force
+  }
+  return $true
+}
 
 Write-Host 'bohe-session-log uninstaller'
 Write-Host '============================'
 
 # ── 1. Skills ──────────────────────────────────────────────────────────────
-foreach ($toolDir in @('.claude', '.codex')) {
-  $target = Join-Path $HOME "$toolDir\skills"
-  $log    = Join-Path $target 'bohe-session-log'
-  $start  = Join-Path $target 'bohe-session-start'
-  if ((Test-Path $log) -or (Test-Path $start)) {
-    if (Test-Path $log)   { Remove-Item -Recurse -Force $log }
-    if (Test-Path $start) { Remove-Item -Recurse -Force $start }
-    Write-Host "OK  Skills       -> removed from $target"
+foreach ($target in $SkillDirs) {
+  $removed = $false
+  foreach ($name in $SkillNames) {
+    if (Remove-ExistingSkill (Join-Path $target $name)) { $removed = $true }
   }
+  if ($removed) { Write-Host "OK  Skills       -> removed from $target" }
 }
 
 # ── 2. Hook delegation in post-commit ──────────────────────────────────────

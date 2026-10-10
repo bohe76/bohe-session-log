@@ -4,6 +4,33 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [Unreleased]
+
+### bohe-session-log
+- **Tool-neutral single procedure** — removed the "runtime branches" (Claude/Unix vs Codex/Windows sections, PowerShell/Bash example blocks, model-specific delegation directives, `.setup_done` marker). Only git commands remain as shell; file operations are described in words. The same `SKILL.md` is installed for every supported tool
+- **Dead Codex route dropped** — references to a repo-local `{branch}.draft.md` writer were removed. It had not fired since the 2026-05-27 switch to the global `core.hooksPath` hook and contradicted the stub-only design
+- **Progressive disclosure via `references/`** — rarely needed procedures moved out of the main body and are read only when triggered: `references/transcript_recovery.md` (crash / compaction recovery) and `references/hook_setup.md` (hook install/verify). `hook_setup.md` adds guidance for repos whose **local `core.hooksPath` (husky, `.githooks`) shadows the global hook**: a two-line chain call instead of copying the hook body (which drifts)
+- **Structure** — "new log vs update" decision folded into Step 2 of the session-end workflow; the read-only "how the next session reads this" aside was removed; the update-mode rules are now their own section; notes de-duplicated. Template, the 7 tags, frontmatter schema, compression rules and the domain-prefix rule are unchanged
+- **Frontmatter fix** — the description no longer contains escaped literal quotes (they showed up verbatim in skill listings). Both skills now pass a strict YAML parser (Antigravity CLI refuses to load skills with frontmatter errors)
+- **Semantics tightened after an independent review** — the draft is reset by the main agent only after verification passes (and no longer by a delegated helper); a hint is shown at Step 1 when commits were made but the draft stayed empty (hook not running / shadowed); update-mode sub-headings only on tags that receive content; transcript recovery: the crash case excludes the current session's own record, summaries are for scope only, no full-persistence claim; hook setup: 4-condition install gate, warning that a global `core.hooksPath` disables every repo's `.git/hooks/*`, chain snippet with `chmod +x` / insert-before-`exit` / `bash` call
+- Tokens (tiktoken o200k_base, Korean source): **7,470 → 4,543 (−39%)**; references ≈ 1.1K each, loaded on demand
+
+### bohe-session-start
+- **Tool-neutral single procedure** — removed the runtime/tool branch section and the PowerShell/Bash blocks. The boundary conditions those blocks encoded are now stated explicitly in prose: "latest log" = newest by mtime excluding `*.draft.md`; unfinished = draft non-empty **and** (no log at all **or** draft newer than the latest log); L1 = current branch's newest log, falling back to the global newest with a "continuing from branch X" note; read from `</done>` onward with full-file fallback for legacy logs; L2 = `decisions_summary` of the global second-newest log only
+- **Scope cleanup** — project-specific routing sentences removed; kept only the general rule that a session-start request never triggers pull/merge/deploy or executing previous TODOs
+- **Description fix** — replaced the stale "unmerged commits + project status" claim (removed in v1.1.0) with the actual L1/L2 + search-mode behavior
+- Unfinished-session approval flow ordered explicitly (obtain the previous transcript first, then run `bohe-session-log` with it); "commits since the log" in the output template defined as commits after the L1 log's mtime (`git log --since`), omitted when 0
+- Tokens (Korean source): **4,560 → 2,850 (−37%)**
+
+### Installer / README
+- **Supported tools: Claude Code · Codex · Cursor · Antigravity CLI · Grok.** Gemini CLI dropped. Antigravity CLI path corrected to `~/.gemini/antigravity-cli/skills/` (official docs; the previous `~/.antigravity/skills/` does not exist). Grok installs to `~/.grok/skills/`
+- Skills are copied only for tools detected on the machine, and an existing skill folder (or symlink/junction) is **replaced in place** — fixes nested `bohe-session-log/bohe-session-log/` copies produced by `cp -r` into an existing directory on re-install
+- Uninstallers now clean every supported tool directory (previously only Claude Code and Codex)
+- Quick-test instructions fixed: the hook is opt-in per repo (`docs/session-log/` must exist) and the draft file is `session.draft.md` (single file since v1.6.0, not `<branch>.draft.md`)
+- README: tool matrix, install locations, `references/` table, and a troubleshooting entry for repo-local `core.hooksPath`
+
+---
+
 ## [1.10.0] — 2026-06-04
 
 ### bohe-session-log

@@ -6,7 +6,7 @@ AI coding agents forget everything when a session ends. You burn the first 20 mi
 
 **bohe-session-log** ends every session with a structured, searchable log that the *next* session reads automatically — decisions, pivots, open questions, and TODOs, restored in seconds. Just a git hook plus two skills; no database, no service, no lock-in.
 
-Works on **macOS / Linux / Windows** with **Claude Code**, **Codex**, **Cursor**, **Gemini CLI**, and **Antigravity CLI**.
+Works on **macOS / Linux / Windows** with **Claude Code**, **Codex**, **Cursor**, **Antigravity CLI**, and **Grok**. One tool-neutral `SKILL.md` per skill — the same file is installed for every tool, with no per-tool branches.
 
 ## Install
 
@@ -26,25 +26,29 @@ cd bohe-session-log; pwsh -ExecutionPolicy Bypass -File install.ps1
 
 The installer:
 
-- Copies skills to each detected tool's skills directory (Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI)
+- Copies the skills to each **detected** tool's skills directory (Claude Code, Codex, Cursor, Antigravity CLI, Grok) — tools that aren't installed are skipped
+- Replaces an existing skill folder (or symlink/junction) in place, so re-running is idempotent
 - Copies the hook script to a stable location (`~/.bohe-session-log/`) so deleting the cloned repo doesn't break it
 - Installs a `post-commit` git hook that **respects your existing `core.hooksPath`** and **appends to any existing hook** rather than overwriting
 
 ### Verify
 
+The hook is opt-in per repository: it only fires where `docs/session-log/` exists.
+
 ```bash
 cd <any git repo>
+mkdir -p docs/session-log
 git commit --allow-empty -m "test hook"
-cat docs/session-log/<branch>.draft.md   # should contain a stub entry
+cat docs/session-log/session.draft.md   # should contain a stub entry
 ```
 
-If you see `## [HH:MM] test hook ...`, the hook is working.
+If you see `## [HH:MM] test hook <!-- sha:… branch:… -->`, the hook is working.
 
 ## Requirements
 
 - `git` 2.9+
 - `bash` (Git Bash on Windows is fine) OR PowerShell 5.1+ for `install.ps1`
-- One of: Claude Code, Codex, Cursor, Gemini CLI, or Antigravity CLI (optional — the hook works without any AI tool)
+- One of: Claude Code, Codex, Cursor, Antigravity CLI, or Grok (optional — the hook works without any AI tool)
 
 ## What it does
 
@@ -69,6 +73,13 @@ git commit
 | `bohe-session-log` | `"end session"`, `"save session"`, `"wrap up"`, `"세션 종료"` | Writes structured session log |
 | `bohe-session-start` | `"session start"`, `"where were we"`, `"continue"`, `"세션 시작"`, `"업무 준비"` | Loads previous session context |
 
+Rarely needed procedures live next to the skill in `references/` and are read only when triggered:
+
+| File | When the agent reads it |
+|------|------------------------|
+| `bohe-session-log/references/transcript_recovery.md` | The session was compacted or the previous session crashed — rebuild from the on-disk conversation transcript |
+| `bohe-session-log/references/hook_setup.md` | You explicitly ask to install/verify the hook, or a repo-local `core.hooksPath` (husky, `.githooks`) shadows the global hook |
+
 ### Tool support matrix
 
 | Tool | Skill auto-trigger | Git hook capture |
@@ -76,8 +87,8 @@ git commit
 | Claude Code | ✓ | ✓ |
 | Codex | ✓ | ✓ |
 | Cursor | ✓ | ✓ |
-| Gemini CLI | ✓ | ✓ |
 | Antigravity CLI | ✓ | ✓ |
+| Grok | ✓ | ✓ |
 
 ### Skill install locations
 
@@ -86,10 +97,10 @@ git commit
 | Claude Code | `~/.claude/skills/` |
 | Codex | `~/.codex/skills/` |
 | Cursor | `~/.cursor/skills/` |
-| Gemini CLI | `~/.gemini/skills/` |
-| Antigravity CLI | `~/.antigravity/skills/` |
+| Antigravity CLI | `~/.gemini/antigravity-cli/skills/` |
+| Grok | `~/.grok/skills/` |
 
-The installer auto-detects which tools are present and copies skills to each directory.
+The installer auto-detects which tools are present and copies the skills to each directory.
 
 ## Session log format
 
@@ -127,7 +138,7 @@ bash uninstall.sh         # macOS / Linux / Git Bash
 pwsh -ExecutionPolicy Bypass -File uninstall.ps1   # Windows PowerShell
 ```
 
-Removes skills, the stable hook script, and the delegation line in your `post-commit` hook. **Does not** touch your `core.hooksPath` setting or any session logs in your projects.
+Removes the skills from every supported tool directory, the stable hook script, and the delegation line in your `post-commit` hook. **Does not** touch your `core.hooksPath` setting or any session logs in your projects.
 
 ## Troubleshooting
 
@@ -138,13 +149,17 @@ git config --global core.hooksPath        # should point to a directory
 ls "$(git config --global core.hooksPath)/post-commit"   # file must exist and be executable
 ```
 
+**Hook doesn't fire in one specific repo (husky, `.githooks`, …)**
+
+A repo-local `core.hooksPath` (`git config --local core.hooksPath`) shadows the global hook entirely. Add a two-line chain call to that repo's own `post-commit` — see `skills/bohe-session-log/references/hook_setup.md`.
+
 **Windows: `bash: command not found` when committing**
 
 Git for Windows ships with bash — ensure Git is installed and the post-commit file uses LF line endings (the installers handle this automatically).
 
 **Hook fires but no draft appears**
 
-Make sure you're in a git repo (`git rev-parse --show-toplevel` must succeed) and on a branch (not detached HEAD).
+Make sure `docs/session-log/` exists in that repo (the hook is opt-in), you're in a git repo (`git rev-parse --show-toplevel` must succeed), and on a branch (not detached HEAD).
 
 **Existing `core.hooksPath` was already set**
 
@@ -158,6 +173,9 @@ uninstall.sh / uninstall.ps1    — uninstallers
 skills/
   bohe-session-log/
     SKILL.md
+    references/
+      transcript_recovery.md    — crash / compaction recovery procedure
+      hook_setup.md             — hook install, verify, repo-local hooksPath chaining
     hooks/
       post-commit.sh            — copied to ~/.bohe-session-log/ by installer
   bohe-session-start/
