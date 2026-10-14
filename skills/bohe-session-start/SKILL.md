@@ -25,6 +25,7 @@ A skill for **the running agent to internalize the project state** when a new co
 - **Log files** = the files directly in the store that match `^.+-[0-9]{5}-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$` (**excluding** the `drafts/` subfolder, legacy `*.draft.md` and any other md). **"Latest log"** = the newest of them by **mtime**
 - **Branch name** = `git branch --show-current` with `/` replaced by `-` (`detached` on a detached HEAD). Which branch a log belongs to is decided by an **exact match** `^{branch}-[0-9]{5}-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$` (escape regex metacharacters in the branch name; never a prefix glob — `main` would also match `main-v2-*`)
 - **My draft** = `drafts/{branch}.draft.md`
+- **Merged draft** = a draft of another branch that meets all three. ① Its branch is in neither the local branches (`git for-each-ref --format='%(refname:lstrip=2)' refs/heads`) nor the `branch refs/heads/…` lines of `git worktree list --porcelain` (both compared after the same `/`→`-` replacement; remote-tracking refs are ignored — they linger until pruned). `detached` additionally requires no `detached` line in that list ② It has at least one `<!-- sha:` value and every one gives `git merge-base --is-ancestor <sha> HEAD` exit 0. Any exit 1 means not merged (squash merges land here), anything else means undecidable (the commit was garbage-collected) ③ Nothing outside the 3-line stubs (`## [` line, the single `- ` line right after it, `---`) and blank lines (no hand-written notes). Git refuses to delete a branch checked out in any worktree, so ① means nobody writes to that draft any more
 
 ### 0. Unfinished-session detection
 
@@ -32,15 +33,17 @@ Compare my draft (`drafts/{branch}.draft.md`) with **the current branch's** late
 1. My draft file exists and is **not empty**
 2. The current branch has **no log at all**, **or** my draft is newer than the current branch's latest log
 
-Other branches' drafts are not considered here (they appear in 1.5 as leftover drafts).
+It also counts as unfinished when a merged draft is newer than the current branch's latest log (not checked when the current branch has no log). When commits are made in other branches' worktrees, my draft never appears, so this is the crash signal — caught only after the merge and the pull.
+
+Other branches' drafts are otherwise not considered here (they appear in 1.5 as leftover drafts).
 
 **When detected**, offer one line to the user:
 > "The previous session doesn't seem to have been closed. Write the session log now?"
 
 - Approved → the previous session may have ended in a crash (the draft stubs are commit messages only), so **first** obtain **the previous session's transcript** following the "Crash" row, the finding procedure and the token rules in `references/transcript_recovery.md` of the `bohe-session-log` folder installed next to this skill → run `bohe-session-log` with that as raw material → continue afterwards
-- Declined → skim the draft's commit stubs (the list of commit messages), absorb them, continue
+- Declined → skim the draft's commit stubs (the list of commit messages; the merged draft's stubs if that triggered the detection), absorb them, continue
 
-**Not detected** (no draft, empty draft, or draft older than the log) → skip silently.
+**Not detected** → skip silently.
 
 ### 1. Load context (L1–L2, absorbed inside the agent)
 
@@ -79,8 +82,8 @@ Learn, from frontmatter only, what happened on other branches since you last lef
 
 - **Candidates** = log files of other branches whose mtime is **newer than the current branch's latest log**. If the current branch has no log yet (fresh branch), all other-branch logs are candidates, minus the one adopted as L1
 - Newest first by mtime, **at most 5**. Read only `tldr` and `decisions_summary` from each frontmatter (no body)
-- **Merge flag**: the file-name prefix has `/` replaced by `-`, so apply the same replacement to each branch from `git for-each-ref --format='%(refname:short)' refs/heads` and find the match. If found, `git merge-base --is-ancestor <that branch> HEAD` — exit 0 "merged", 1 "not merged", anything else: omit the flag (a squash-merged branch shows as "not merged"). If not found → "branch deleted"
-- **Leftover drafts**: non-empty files in `drafts/` other than the current branch → `{branch} (N stubs) [in progress|no log]`. If that branch appears in a `branch refs/heads/…` line of `git worktree list --porcelain` (compare the name after `refs/heads/` with the same `/`→`-` replacement), it is **in progress** in another worktree; otherwise **no log** (a worktree removed without ending its session). `detached` and `legacy` are not branches — list them as they are. To fold a leftover draft into a log, run the session end in a session that has that branch checked out (file name, number and the draft to delete all derive from that branch) — never write it from here. If the branch no longer exists or the file is `legacy`, there is nothing to check out: the user reviews the content and deletes the file by hand (the commit messages remain in git)
+- **Merge flag**: the file-name prefix has `/` replaced by `-`, so apply the same replacement to each branch from `git for-each-ref --format='%(refname:lstrip=2)' refs/heads` and find the match. If found, `git merge-base --is-ancestor <that branch> HEAD` — exit 0 "merged", 1 "not merged", anything else: omit the flag (a squash-merged branch shows as "not merged"). If not found → "branch deleted"
+- **Leftover drafts**: non-empty files in `drafts/` other than the current branch → `{branch} (N stubs) [merged — folded at session end|in progress|no log]`. A merged draft is **merged — folded at session end** (the current branch's session end absorbs and deletes it). Otherwise, if that branch appears in a `branch refs/heads/…` line of `git worktree list --porcelain` (compare the name after `refs/heads/` with the same `/`→`-` replacement), it is **in progress** in another worktree; otherwise **no log** (a worktree removed without ending its session). `detached` and `legacy` are not branches — list them as they are. For in progress / no log, to fold a leftover draft into a log, run the session end in a session that has that branch checked out (file name, number and the draft to delete all derive from that branch) — never write it from here. If it is not a merged draft and the branch no longer exists or the file is `legacy`, there is nothing to check out — the merge may not have arrived yet (before a pull, or merged into another branch), so say it will be folded by that branch's session end once it arrives; whatever still remains after that (squash merge, deleted unmerged, notes) the user reviews and deletes by hand (the commit messages remain in git)
 - May overlap with L2 (accepted). Absorb `decisions_summary` internally; the user output gets only the two template lines below
 
 ### 2. User output (one compressed paragraph + TODOs)
@@ -94,7 +97,7 @@ Continuing from session {N} ({date}, {stage}) — {tldr}.
 Prior decisions: {core of the L2 decisions_summary — omit this line if none}.
 {N} commits since the log{summarize 1–2 in parentheses only if important}.
 Inflow from other branches: {branch}-{number} — {tldr} [merged|not merged|branch deleted] {up to 5 lines}
-Leftover drafts: {branch} ({N} stubs) [in progress|no log]{, …}
+Leftover drafts: {branch} ({N} stubs) [merged — folded at session end|in progress|no log]{, …}
 
 ### Today's TODOs
 - [ ] {TODO 1}

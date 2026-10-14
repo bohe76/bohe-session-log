@@ -69,7 +69,7 @@ git commit
 
 ### Branches and worktrees
 
-There is **one store per repository**: the `docs/session-log/` of the **main worktree**. Linked worktrees write their drafts and logs there too, so nothing is lost when a worktree is removed, and a session on `main` sees every branch's logs. Logs are named per branch (`<branch>-<number>-<date>.md`, numbering independent per branch) and drafts are one file per branch (`drafts/<branch>.draft.md`), so concurrent worktrees never write to the same file. At session start the agent lists other-branch logs newer than your branch's last log (with a merged / not-merged flag) and any leftover branch drafts (in progress in another worktree, or ended without a log).
+There is **one store per repository**: the `docs/session-log/` of the **main worktree**. Linked worktrees write their drafts and logs there too, so nothing is lost when a worktree is removed, and a session on `main` sees every branch's logs. Logs are named per branch (`<branch>-<number>-<date>.md`, numbering independent per branch) and drafts are one file per branch (`drafts/<branch>.draft.md`), so concurrent worktrees never write to the same file. At session start the agent lists other-branch logs newer than your branch's last log (with a merged / not-merged flag) and any leftover branch drafts (in progress in another worktree, or ended without a log). If you work lead-style — one session stays on `dev` while agents commit in throwaway worktrees and each PR is merged and its branch deleted — those work-branch drafts are recognized as **merged** (branch gone, every stub SHA already in your history) and folded into the next session-end log of the branch they were merged into.
 
 ## Skills
 
@@ -185,6 +185,8 @@ skills/
       post-commit.sh            — copied to ~/.bohe-session-log/ by installer
   bohe-session-start/
     SKILL.md
+tests/
+  merged_draft_test.sh          — regression test for merged-draft handling (bash, temp repo)
 CHANGELOG.md
 LICENSE
 ```

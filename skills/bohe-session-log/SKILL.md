@@ -28,12 +28,15 @@ Session logs and drafts are personal work records and are excluded from git trac
 
 **Draft**: `drafts/{branch}.draft.md` — one file per branch. The hook appends a stub on every commit (the header records `branch:`). The file exists = that branch has commits not yet folded into a log
 
+- **Merged draft** = a draft of another branch that meets all three. ① Its branch is in neither the local branches (`git for-each-ref --format='%(refname:lstrip=2)' refs/heads`) nor the `branch refs/heads/…` lines of `git worktree list --porcelain` (both compared after the same `/`→`-` replacement; remote-tracking refs are ignored — they linger until pruned). `detached` additionally requires no `detached` line in that list ② It has at least one `<!-- sha:` value and every one gives `git merge-base --is-ancestor <sha> HEAD` exit 0. Any exit 1 means not merged (squash merges land here), anything else means undecidable (the commit was garbage-collected) ③ Nothing outside the 3-line stubs (`## [` line, the single `- ` line right after it, `---`) and blank lines (no hand-written notes). Git refuses to delete a branch checked out in any worktree, so ① means nobody writes to that draft any more
+
 ## Draft (raw material)
 
 Always check the current branch's `drafts/{branch}.draft.md` before ending the session.
 - Exists and non-empty: read it as raw material, and after the log passes verification (Step 2.5) delete the file
 - Missing: write the log from the conversation context alone (normal case)
-- Never touch other branches' draft files — they are the raw material of those branches' sessions
+- Also read merged drafts as raw material — their commits are already in the current branch's history. Fold their stubs into `<done>` prefixed `inflow {branch}:` (never as if committed on the current branch), and delete them together after verification
+- Never touch any other branch's draft files — they are the raw material of those branches' sessions
 - If a legacy single `session.draft.md` or a `{branch}.draft.md` directly in the store is still present, or the store resolved to case ② (a worktree-local store), run "Migrating legacy drafts" in `references/hook_setup.md` of this skill's folder once, then continue
 
 The draft is the accumulation of stubs that the installed git post-commit hook appends on every commit. Each stub carries **only the commit message** (no LLM — only what git knows). Format:
@@ -68,7 +71,7 @@ After checking `git status`:
 - Changes present → add and commit **work files only** (exclude session logs and the draft). The hook appends a stub to the draft
 - No changes → skip the commit
 
-**Continue even if no hook is installed.** The draft is simply empty; the log is written from the conversation context. If this session made commits but the current branch's draft file does not exist, mention in one line that the hook may not be running (not installed, or a repo-local `core.hooksPath` shadows the global hook), and follow `references/hook_setup.md` in this skill's folder only if the user wants it checked or installed. Never install just because the session is ending.
+**Continue even if no hook is installed.** The draft is simply empty; the log is written from the conversation context. If this session made commits but none of the branches it committed to (other worktrees included) has a draft file, mention in one line that the hook may not be running (not installed, or a repo-local `core.hooksPath` shadows the global hook), and follow `references/hook_setup.md` in this skill's folder only if the user wants it checked or installed. Never install just because the session is ending.
 
 ### Step 2 — Write the session log
 
@@ -76,10 +79,10 @@ After checking `git status`:
    - Latest file is **today** + **same context** → update the existing file (§Update mode)
    - Today but different context, or a past date → new file with number +1 (today's date)
    - Context test: update if the existing `<done>` continues into the current work or the existing `<todos>` are being executed; new file if the topic (screen/feature/subject) is entirely different
-2. **Gather raw material** — `drafts/{branch}.draft.md` + conversation context. **If the session was compacted (context compression) at any point**, the current context is a summary and details are missing → follow `references/transcript_recovery.md` in this skill's folder to read the current session's transcript (unnecessary on a normal end)
-3. **Write** — fill in per §Template, §Section guide and §Frontmatter guide. **Save directly, without proposing a draft** (do not ask the user). Short or simple sessions are written by the main agent itself. Delegate to a helper worker only when delegation actually improves the write-up quality or the context cost; the delegation prompt must then include: branch, next number, today's date; the draft's absolute path; a core summary of the conversation (tag-classification hints + entities/tags/decisions_summary hints); the obligation to follow this skill's guides; the output absolute path
+2. **Gather raw material** — `drafts/{branch}.draft.md` + merged drafts + conversation context. **If the session was compacted (context compression) at any point**, the current context is a summary and details are missing → follow `references/transcript_recovery.md` in this skill's folder to read the current session's transcript (unnecessary on a normal end)
+3. **Write** — fill in per §Template, §Section guide and §Frontmatter guide. **Save directly, without proposing a draft** (do not ask the user). Short or simple sessions are written by the main agent itself. Delegate to a helper worker only when delegation actually improves the write-up quality or the context cost; the delegation prompt must then include: branch, next number, today's date; the draft's absolute path (merged drafts and the `inflow` prefix rule included); a core summary of the conversation (tag-classification hints + entities/tags/decisions_summary hints); the obligation to follow this skill's guides; the output absolute path
 4. **Verify (main agent)** — required frontmatter fields, matching XML tag pairs, file name consistency
-5. **Reset the draft (main agent, after verification passes)** — **delete** `drafts/{branch}.draft.md` (do not leave an empty file; a remaining file is the marker of a branch that ended without a log). Never delete it before verifying (a failed write would lose the raw material). Do not touch other branches' files
+5. **Reset the draft (main agent, after verification passes)** — **delete** `drafts/{branch}.draft.md` (do not leave an empty file; a remaining file is the marker of a branch that ended without a log). Never delete it before verifying (a failed write would lose the raw material). Also delete the merged drafts read in 2 after judging them again right before deletion — only if their stubs are unchanged since reading (otherwise keep them). Do not touch any other branch's files
 
 ### Step 3 — End
 
@@ -195,7 +198,7 @@ compressed: OrderListItem partner_name missing → FE partner column empty → a
 
 Never add or delete existing content freely — append in **history form**.
 - Add a `### 갱신 {HH:MM or "afternoon session"}` sub-heading at the **inner end** of each XML tag block that receives new content (never outside the tag; tags with nothing to add get no sub-heading). If the draft spans several times, use the latest time and merge everything into one update section
-- Draft stubs go into the `<done>` update section; decisions extracted from the conversation are appended at the end of `<decisions>`. Existing `<decisions>`/`<pivots>` are kept
+- Draft stubs go into the `<done>` update section (merged-draft stubs prefixed `inflow {branch}:`); decisions extracted from the conversation are appended at the end of `<decisions>`. Existing `<decisions>`/`<pivots>` are kept
 - `<todos>`: strike completed items with `~~strikethrough~~`, then add new ones
 - **Never delete existing content** — even wrong content is preserved with `~~strikethrough~~`
 - Frontmatter: overwrite `stage`/`tldr` with the current state (progress); **merge existing + new** for `tags`/`entities`/`decisions_summary` (de-duplicate)
