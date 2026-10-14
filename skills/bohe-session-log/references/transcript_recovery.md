@@ -7,18 +7,18 @@ Reference for `bohe-session-log`. The draft holds commit-message stubs only, so 
 | Scenario | When | What to read |
 |---|---|---|
 | **Compaction** | Session-end Step 2; the session was compacted at some point | **the current session's** transcript |
-| **Crash** | Next session start; `bohe-session-start` unfinished-session detection approved | **the previous session's** transcript |
+| **Crash** | Next session start; `bohe-session-start` unfinished-session detection approved | **the previous session's** transcript (any tool) |
 
 ## Finding the transcript
 
-**The currently running tool finds its own session record** (each CLI leaves the conversation on disk).
+Each CLI leaves the conversation on disk. **Compaction** looks only at the running tool's own records. **Crash** looks at **all** the locations below (installed tools only), because the previous session may have run in another tool.
 
-- Candidate search: **current working directory (cwd) + most recent modification (mtime)**. Do not settle on mtime alone — cross-check the session id / cwd metadata inside the record. **Compaction** targets the current session's record; **crash** targets the most recent record with a matching cwd, *excluding* the current session's own record. If concurrent sessions or subagents cannot be told apart, report candidates only
+- Candidate search: **cwd (the current working directory, or another worktree path of this repo from `git worktree list`) + most recent modification (mtime)**. Do not settle on mtime alone — cross-check the session id / cwd metadata inside the record. **Compaction** targets the current session's record. **Crash** excludes the current session's record and, **across tools**, among the records whose last activity is later than the current branch's latest log (no lower bound if the branch has no log), **settles on** the most recent one whose raw text contains a stub sha or commit message from the draft that triggered the detection — time alone cannot tell it apart from a normally ended session (its record goes on after the log is written) or a session still running in another worktree. If no record contains one, report candidates only or fall back to degraded mode. Tell the user which tool's record was used. If concurrent sessions or subagents cannot be told apart, report candidates only
 - Known location hints:
   - **Claude Code**: `~/.claude/projects/<encoded-cwd>/<session>.jsonl`
   - **Codex**: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (under `CODEX_HOME` if set). Match the session via `session_meta.payload.id/cwd` on the first line. Extract only user/assistant message text from `response_item` plus any needed `event_msg`; drop tool results, attachments and duplicate events
-  - **Antigravity CLI**: find the `conversationId` via `workspace` (= cwd) in `~/.gemini/antigravity-cli/history.jsonl` → `~/.gemini/antigravity-cli/brain/<conversationId>/.system_generated/logs/transcript_full.jsonl`
-  - **Other tools**: locate your CLI's session-record directory and apply the same rule (cwd + newest)
+  - **Antigravity CLI**: find the `conversationId` via `workspace` (= cwd) in `~/.gemini/antigravity-cli/history.jsonl` → `~/.gemini/antigravity-cli/brain/<conversationId>/.system_generated/logs/transcript_full.jsonl` (activity time = this file's mtime; `history.jsonl` is a shared index, so its mtime is not per session)
+  - **Other tools**: locate your CLI's session-record directory and apply the same rule (cwd + newest + stub match)
 - Not found → recover from the draft stubs only (degraded mode). Do not guess; tell the user "transcript not found, writing from stubs only". If the record is incomplete, state that range in the log
 
 ## Token management (never read the whole thing)

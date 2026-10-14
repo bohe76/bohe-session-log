@@ -67,7 +67,7 @@ Where the global hook is installed, this step "activates" the repo: from now on 
 
 ### Step 1 — Commit the work files
 
-After checking `git status`:
+If invoked by session start's unfinished-session recovery, skip this whole step — leftover uncommitted changes may be the previous session's unfinished work, so do not commit them; mention them in one line (the user decides whether to commit). Otherwise, after checking `git status`:
 - Changes present → add and commit **work files only** (exclude session logs and the draft). The hook appends a stub to the draft
 - No changes → skip the commit
 

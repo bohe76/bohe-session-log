@@ -4,6 +4,17 @@ Change history for session management skills (bohe-session-log, bohe-session-sta
 
 ---
 
+## [2.1.1] — 2026-10-14
+
+### Three deferred defects fixed (reported out of scope by the v2.0.0 review)
+- **p4 — crash recovery committed at session start** — approving the unfinished-session prompt ran `bohe-session-log` in full, so its Step 1 committed whatever was uncommitted when the new session started (possibly the crashed session's unfinished work). The approval path now runs it **without Step 1**; the exception is the first sentence of session-log Step 1 (so a top-to-bottom reader cannot commit first) and the one-line notice about uncommitted changes lives there only. The user decides whether to commit
+- **p6 — crash in tool A, resume in tool B found nothing** — `references/transcript_recovery.md` said "the running tool finds its own record", which also applied to crash recovery. Compaction still reads only the running tool's own record; crash recovery now searches every installed tool's known location (cwd includes this repo's other worktrees) and, **across tools**, among records active after the current branch's latest log, **settles on** the newest one whose raw text contains a stub sha or commit message from the draft that triggered the detection. Time alone cannot exclude a normally ended session (its record continues after the log is written) or a session still running in another worktree; with no match it reports candidates only or falls back to stubs. It says which tool's record was used. Antigravity activity time is the `transcript_full.jsonl` mtime (`history.jsonl` is a shared index). Measured: Codex's first `session_meta` line and Antigravity's `history.jsonl` `workspace` both carry the cwd
+- **p7 — search-mode pattern false positives and misses** — `^tags:.*\n(  - .*\n)*.*{query}` let the trailing `.*{query}` hit the line after the list (the next field), crossed lines under dotall, and missed flow lists such as `tags: [ui, auth]`. Now `^tags:([^\n]*{query}|[^\n]*\n([ ]*- [^\n]*\n)*[ ]*- [^\n]*{query})`, with the query regex-escaped, case-insensitive, and hits accepted only inside the frontmatter. Measured on 6 samples: the old pattern matched 5 (3 false positives) and missed 1; the new one matches exactly the 3 true positives
+- **Independent review** — APPROVE (2 MEDIUM, 5 LOW, all applied; the MEDIUMs were the time-only lower bound in p6), delta re-review APPROVE (one LOW applied, one accepted: a subagent's record can carry the same sha, covered by "report candidates only")
+- Tokens (tiktoken o200k_base, Korean source): session-log 5,733 → 5,802, session-start 4,314 → 4,451, `transcript_recovery.md` 1,092 → 1,327
+
+---
+
 ## [2.1.0] — 2026-10-14
 
 ### Merged work-branch drafts are folded at session end (both skills, hook unchanged)

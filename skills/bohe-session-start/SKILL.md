@@ -40,7 +40,7 @@ Other branches' drafts are otherwise not considered here (they appear in 1.5 as 
 **When detected**, offer one line to the user:
 > "The previous session doesn't seem to have been closed. Write the session log now?"
 
-- Approved → the previous session may have ended in a crash (the draft stubs are commit messages only), so **first** obtain **the previous session's transcript** following the "Crash" row, the finding procedure and the token rules in `references/transcript_recovery.md` of the `bohe-session-log` folder installed next to this skill → run `bohe-session-log` with that as raw material → continue afterwards
+- Approved → the previous session may have ended in a crash (the draft stubs are commit messages only), so **first** obtain **the previous session's transcript** following the "Crash" row, the finding procedure and the token rules in `references/transcript_recovery.md` of the `bohe-session-log` folder installed next to this skill → run `bohe-session-log` with that as raw material **without Step 1 (committing work files)** (uncommitted changes are not committed) → continue afterwards
 - Declined → skim the draft's commit stubs (the list of commit messages; the merged draft's stubs if that triggered the detection), absorb them, continue
 
 **Not detected** → skip silently.
@@ -121,7 +121,7 @@ Wait for the user's instruction. **Never start work first** — even with `<todo
 For **log search requests** such as "find sessions about X", "search the session logs for Y", "when did we decide Z", answer with **a frontmatter grep instead of a full load**. A search request does not trigger the L1–L2 load. After presenting results, switch to context-load mode only when the user says "continue from this session".
 
 1. **Map the query to fields**: domain/feature keyword → `tags:`; component/module/file name → `entities:`; decision wording → `decisions_summary:`; free text → `tldr:`; unclear → all four fields
-2. **Grep frontmatter only** — in the store's log files, combine the field's leading line with the query. If a YAML list spans several lines, use a multiline pattern (`^tags:.*\n(  - .*\n)*.*{query}`) to reach inside the list
+2. **Grep frontmatter only** — in the store's log files, combine the field's leading line with the query. If a YAML list spans several lines, use a multiline pattern (`^tags:([^\n]*{query}|[^\n]*\n([ ]*- [^\n]*\n)*[ ]*- [^\n]*{query})`) to reach inside the list — the query matches only on the field's own line or its `- ` items (`[^\n]` instead of `.`, so it cannot cross lines or hit the next field). Escape regex metacharacters in the query, match case-insensitively, and accept a hit only inside the frontmatter (first `---` to second `---`)
 3. **Legacy fallback** — old-format logs lack `tags`/`entities`/`decisions_summary`/`related_sessions` and are missed by the first grep. In order:
    - 1st: grep `tags:`·`entities:`·`decisions_summary:` (new format)
    - 0 hits → 2nd: grep `tldr:` (common to old and new formats)
