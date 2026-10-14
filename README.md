@@ -62,14 +62,16 @@ git commit
   → AI writes a formal session log from draft + conversation, then deletes the draft
 
 "session start" / "where were we"
-  → AI loads previous decisions, open questions, and TODOs
+  → AI loads the last session's decisions, open questions, and TODOs (any branch)
   → plus what other branches / worktrees did since (frontmatter only)
   → ready to continue
 ```
 
 ### Branches and worktrees
 
-There is **one store per repository**: the `docs/session-log/` of the **main worktree**. Linked worktrees write their drafts and logs there too, so nothing is lost when a worktree is removed, and a session on `main` sees every branch's logs. Logs are named per branch (`<branch>-<number>-<date>.md`, numbering independent per branch) and drafts are one file per branch (`drafts/<branch>.draft.md`), so concurrent worktrees never write to the same file. At session start the agent lists other-branch logs newer than your branch's last log (with a merged / not-merged flag) and any leftover branch drafts (in progress in another worktree, or ended without a log). If you work lead-style — one session stays on `dev` while agents commit in throwaway worktrees and each PR is merged and its branch deleted — those work-branch drafts are recognized as **merged** (branch gone, every stub SHA already in your history) and folded into the next session-end log of the branch they were merged into.
+There is **one store per repository**: the `docs/session-log/` of the **main worktree**. Linked worktrees write their drafts and logs there too, so nothing is lost when a worktree is removed, and a session on `main` sees every branch's logs. Logs are named per branch (`<branch>-<number>-<date>.md`, numbering independent per branch) and drafts are one file per branch (`drafts/<branch>.draft.md`), so concurrent worktrees never write to the same file.
+
+**Session start always continues from the last session log, whichever branch it was written on**, and a single session end is enough even if the session committed to several branches: it folds in every draft nobody can still write to — a branch checked out in no worktree — tagged `inflow <branch>(merged|not merged)`. Only drafts of branches checked out in another worktree (in progress) or carrying hand-written notes are left alone. That covers all three common setups: everything on `main`; `main` as home with occasional branches; or one lead session on `dev` while agents commit in throwaway worktrees and each PR is merged and its branch deleted.
 
 ## Skills
 
@@ -186,7 +188,7 @@ skills/
   bohe-session-start/
     SKILL.md
 tests/
-  merged_draft_test.sh          — regression test for merged-draft handling (bash, temp repo)
+  draft_handoff_test.sh         — regression test for draft handoff and global-latest loading (bash, temp repo)
 CHANGELOG.md
 LICENSE
 ```

@@ -25,23 +25,19 @@ A skill for **the running agent to internalize the project state** when a new co
 - **Log files** = the files directly in the store that match `^.+-[0-9]{5}-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$` (**excluding** the `drafts/` subfolder, legacy `*.draft.md` and any other md). **"Latest log"** = the newest of them by **mtime**
 - **Branch name** = `git branch --show-current` with `/` replaced by `-` (`detached` on a detached HEAD). Which branch a log belongs to is decided by an **exact match** `^{branch}-[0-9]{5}-[0-9]{4}-[0-9]{2}-[0-9]{2}\.md$` (escape regex metacharacters in the branch name; never a prefix glob — `main` would also match `main-v2-*`)
 - **My draft** = `drafts/{branch}.draft.md`
-- **Merged draft** = a draft of another branch that meets all three. ① Its branch is in neither the local branches (`git for-each-ref --format='%(refname:lstrip=2)' refs/heads`) nor the `branch refs/heads/…` lines of `git worktree list --porcelain` (both compared after the same `/`→`-` replacement; remote-tracking refs are ignored — they linger until pruned). `detached` additionally requires no `detached` line in that list ② It has at least one `<!-- sha:` value and every one gives `git merge-base --is-ancestor <sha> HEAD` exit 0. Any exit 1 means not merged (squash merges land here), anything else means undecidable (the commit was garbage-collected) ③ Nothing outside the 3-line stubs (`## [` line, the single `- ` line right after it, `---`) and blank lines (no hand-written notes). Git refuses to delete a branch checked out in any worktree, so ① means nobody writes to that draft any more
+- **Handoff draft** = a non-empty draft of another branch that meets both. ① Nobody writes to it — its branch is in no `branch refs/heads/…` line of `git worktree list --porcelain` (compared after the same `/`→`-` replacement), and, for a `detached` entry in the middle of a rebase or bisect, it is not the branch named by that worktree's `rebase-merge/head-name`·`rebase-apply/head-name`·`BISECT_START` (`git -C <worktree> rev-parse --path-format=absolute --git-path …`; compare without the `refs/heads/` prefix). Entries with a `prunable` line (directory gone) are ignored. Git never commits to a branch without checking it out and never checks one branch out in two worktrees, so a branch checked out nowhere has no writer. `detached` additionally requires no `detached` line in that list ② Nothing outside the 3-line stubs (`## [` line, the single `- ` line right after it, `---`) and blank lines (no hand-written notes). Merge status is an annotation, not a condition — "merged" if every `<!-- sha:` value gives `git merge-base --is-ancestor <sha> HEAD` exit 0, otherwise "not merged"
 
 ### 0. Unfinished-session detection
 
-Compare my draft (`drafts/{branch}.draft.md`) with **the current branch's** latest log. The previous session counts as unfinished when **both** hold:
-1. My draft file exists and is **not empty**
-2. The current branch has **no log at all**, **or** my draft is newer than the current branch's latest log
+Compare my draft and the handoff drafts with **the global latest log** (any branch). If any of them is non-empty and newer than the global latest log (with no log at all, its mere existence counts), the previous session counts as unfinished — whichever branch it committed to, it ended without a session end.
 
-It also counts as unfinished when a merged draft is newer than the current branch's latest log (not checked when the current branch has no log). When commits are made in other branches' worktrees, my draft never appears, so this is the crash signal — caught only after the merge and the pull.
-
-Other branches' drafts are otherwise not considered here (they appear in 1.5 as leftover drafts).
+Drafts of branches in progress in another worktree are not considered here (they appear in 1.5 as leftover drafts).
 
 **When detected**, offer one line to the user:
-> "The previous session doesn't seem to have been closed. Write the session log now?"
+> "There are commits not recorded since the last session log (the session ended without a session end, or commits came after it). Write the session log now?"
 
 - Approved → the previous session may have ended in a crash (the draft stubs are commit messages only), so **first** obtain **the previous session's transcript** following the "Crash" row, the finding procedure and the token rules in `references/transcript_recovery.md` of the `bohe-session-log` folder installed next to this skill → run `bohe-session-log` with that as raw material **without Step 1 (committing work files)** (uncommitted changes are not committed) → continue afterwards
-- Declined → skim the draft's commit stubs (the list of commit messages; the merged draft's stubs if that triggered the detection), absorb them, continue
+- Declined → skim the detected drafts' commit stubs (the list of commit messages), absorb them, continue
 
 **Not detected** → skip silently.
 
@@ -51,10 +47,9 @@ Read two layers into the agent's own working memory. Do not list each layer's co
 
 #### L1 — previous session (only the part after `<done>`)
 
-**Current branch's newest first, falling back to the global newest by mtime** (draft excluded in all cases):
-- Newest by mtime among the current branch's logs (exact match) → L1
-- None → the global latest log → L1. Its frontmatter `branch` may differ from the current branch → note "continuing work from another branch ({branch})" in the user output
-- None at all → "no previous session log"
+**The global latest log by mtime** (any branch, draft excluded) → L1. Logs pile up in one store whichever branch the session ended on, and what you continue is the last session:
+- If its frontmatter `branch` differs from the current branch, note "continuing work from another branch ({branch})" in the user output
+- No log → "no previous session log"
 
 **Read range — load from `</done>` onward**: find the line number of `</done>` in the file and read only what follows (skips the `<done>` section, most of the body). If there is no `</done>` (legacy Markdown format), fall back to reading the whole file.
 
@@ -74,16 +69,16 @@ Read two layers into the agent's own working memory. Do not list each layer's co
 
 From the frontmatter (between the first `---` and the second `---` at the top) of the **global second-newest** log by mtime (any branch, draft excluded), extract only the `decisions_summary` field. If the YAML list spans several lines, include only its indented items. If there is no second file, skip silently.
 
-L1 is branch-first while L2 is global-second — an asymmetry (L2's purpose is "backstop decisions from the session before the previous one", so it stays branch-agnostic). Recent work on other branches is picked up separately by 1.5 below. If L2 conflicts with the current code/files, **trust the current state** — the record is a past snapshot.
+Other work on other branches is picked up separately by 1.5 below. If L2 conflicts with the current code/files, **trust the current state** — the record is a past snapshot.
 
 #### 1.5 — Inflow (what happened on other branches / worktrees)
 
-Learn, from frontmatter only, what happened on other branches since you last left this one. When a session starts on main, work merged in from feature branches shows up here.
+Learn, from frontmatter only, what happened on other branches since you last left this one — whatever L1 did not already cover.
 
-- **Candidates** = log files of other branches whose mtime is **newer than the current branch's latest log**. If the current branch has no log yet (fresh branch), all other-branch logs are candidates, minus the one adopted as L1
+- **Candidates** = log files that are neither the current branch's nor L1, whose mtime is **newer than the current branch's latest log** (all of them if the current branch has no log)
 - Newest first by mtime, **at most 5**. Read only `tldr` and `decisions_summary` from each frontmatter (no body)
 - **Merge flag**: the file-name prefix has `/` replaced by `-`, so apply the same replacement to each branch from `git for-each-ref --format='%(refname:lstrip=2)' refs/heads` and find the match. If found, `git merge-base --is-ancestor <that branch> HEAD` — exit 0 "merged", 1 "not merged", anything else: omit the flag (a squash-merged branch shows as "not merged"). If not found → "branch deleted"
-- **Leftover drafts**: non-empty files in `drafts/` other than the current branch → `{branch} (N stubs) [merged — folded at session end|in progress|no log]`. A merged draft is **merged — folded at session end** (the current branch's session end absorbs and deletes it). Otherwise, if that branch appears in a `branch refs/heads/…` line of `git worktree list --porcelain` (compare the name after `refs/heads/` with the same `/`→`-` replacement), it is **in progress** in another worktree; otherwise **no log** (a worktree removed without ending its session). `detached` and `legacy` are not branches — list them as they are. For in progress / no log, to fold a leftover draft into a log, run the session end in a session that has that branch checked out (file name, number and the draft to delete all derive from that branch) — never write it from here. If it is not a merged draft and the branch no longer exists or the file is `legacy`, there is nothing to check out — the merge may not have arrived yet (before a pull, or merged into another branch), so say it will be folded by that branch's session end once it arrives; whatever still remains after that (squash merge, deleted unmerged, notes) the user reviews and deletes by hand (the commit messages remain in git)
+- **Leftover drafts**: non-empty files in `drafts/` other than the current branch → `{branch} (N stubs) [folded at session end (merged|not merged)|in progress|has notes — review]`. A handoff draft is **folded at session end** (the next session end, on any branch, absorbs and deletes it); one caught by ① (checked out in another worktree) is **in progress**; one caught by ② is **has notes — review** (the user reviews and cleans it up by hand; the commit messages remain in git)
 - May overlap with L2 (accepted). Absorb `decisions_summary` internally; the user output gets only the two template lines below
 
 ### 2. User output (one compressed paragraph + TODOs)
@@ -93,11 +88,11 @@ After absorbing L1–L2, report to the user **briefly**. No long summaries.
 ```
 ## Context restored
 
-Continuing from session {N} ({date}, {stage}) — {tldr}.
+Continuing from session {N} ({date}, {stage}{, continuing work from another branch {branch}}) — {tldr}.
 Prior decisions: {core of the L2 decisions_summary — omit this line if none}.
 {N} commits since the log{summarize 1–2 in parentheses only if important}.
 Inflow from other branches: {branch}-{number} — {tldr} [merged|not merged|branch deleted] {up to 5 lines}
-Leftover drafts: {branch} ({N} stubs) [merged — folded at session end|in progress|no log]{, …}
+Leftover drafts: {branch} ({N} stubs) [folded at session end (merged|not merged)|in progress|has notes — review]{, …}
 
 ### Today's TODOs
 - [ ] {TODO 1}
@@ -107,10 +102,10 @@ Tell me which task to proceed with, or give me a different one.
 ```
 
 - The body is only the template lines above — a one-glance view of the state to continue
-- "Commits since the log" = commits on the current branch after the L1 log file's mtime (count with `git log --since=<L1 mtime> --oneline`). Omit the line when it is 0
+- "Commits since the log" = commits on **the current branch** after the L1 log file's mtime (count with `git log --since=<L1 mtime> --oneline`). Even when L1 is another branch's log, count the current branch — what happened on this branch after that session. Omit the line when it is 0
 - Details of `<done>`, `<decisions>`, `<blockers>` are not included in the user output (agent-internal only)
 - Omit the unfinished-session line if nothing was detected. Omit the inflow / leftover-draft lines too when there is nothing to list. TODOs come from L1's `<todos>`; if none, replace with "tell me what to work on"
-- If there is no session log at all: "No previous session log — new project or new branch", then wait for instructions
+- If there is no session log at all: "No previous session log — new project", then wait for instructions
 
 ### 3. Ready (wait)
 
