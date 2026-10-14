@@ -1,5 +1,7 @@
 # bohe-session-log
 
+**English** | [한국어](README.ko.md)
+
 **Persistent memory for AI coding agents — your next session picks up exactly where the last one left off.**
 
 AI coding agents forget everything when a session ends. You burn the first 20 minutes re-explaining what you built, what you decided, and what's still open — and the agent *still* repeats mistakes you already ruled out.
@@ -189,6 +191,7 @@ skills/
     SKILL.md
 tests/
   draft_handoff_test.sh         — regression test for draft handoff and global-latest loading (bash, temp repo)
+README.md / README.ko.md        — English / Korean
 CHANGELOG.md
 LICENSE
 ```
